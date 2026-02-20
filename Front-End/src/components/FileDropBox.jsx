@@ -1,4 +1,6 @@
 import React from "react";
+import '../styles/FileDropBox.css'
+
 
 function FileDropBox({ onFileSelect }) {
   const handleChange = (event) => {
@@ -8,11 +10,24 @@ function FileDropBox({ onFileSelect }) {
     }
   };
 
-  return (
-    <div>
-      <input type="file" onChange={handleChange} />
+ return (
+    <div className="file-dropbox-container">
+      <label className="file-dropbox-label" htmlFor="fileDropBox">
+        Upload Your Music File
+      </label>
+      <input
+        type="file"
+        id="fileDropBox"
+        className="file-dropbox-input"
+        onChange={handleChange}
+        accept=".mscz,.musicxml,.jpg,.png"
+      />
+      <p className="file-dropbox-hint">
+        Supported formats: MSCZ, MUSICXML, JPG, PNG.
+      </p>
     </div>
   );
 }
 
 export default FileDropBox;
+

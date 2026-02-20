@@ -1,0 +1,20 @@
+.tab-page {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;    
+  text-align: center;
+  color: #121212;
+  padding: 2rem;
+}
+
+.tab-page h2 {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+  color: #F56960; 
+}
+
+.tab-page p {
+  font-size: 1.2rem;
+  max-width: 600px;
+}
