@@ -11,7 +11,7 @@ function Home() {
 
   const handleFile = (file) => {
     console.log("Selected file:", file);
-    navigate("/tab"); // Navigate to tab placeholder page
+    navigate("/tab"); // nav to tab placeholder page
   };
 
   return (
