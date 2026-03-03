@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { Routes, Route, useNavigate } from 'react-router-dom';
-import './styles/App.css'
-import FileDropBox from './components/FileDropBox'
-import DescriptionBox from "./components/DescriptionBox";
-import GuitarTabPage from "./pages/GuitarTabPage";
+import '../styles/App.css'
+import FileDropBox from '../components/FileDropBox'
+import DescriptionBox from "../components/DescriptionBox";
+import GuitarTabPage from "./GuitarTabPage";
 
 
 function Home() {
