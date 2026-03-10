@@ -1,10 +1,17 @@
+# music21 docs recommend to import this for security reasons. It must
+#   be imported *before* music21
+import defusedxml 
+defusedxml.defuse_stdlib() # type: ignore
+
 from fastapi import FastAPI, UploadFile, HTTPException
 from fastapi.responses import Response
 from tempfile import TemporaryDirectory
 import subprocess
 from pathlib import Path
-from music21 import converter
-from itertools import islice
+from music21 import converter, stream
+import math
+
+from .conversions import add_tab
 
 app = FastAPI()
 
@@ -40,28 +47,15 @@ async def upload_musescore_file(file: UploadFile):
         else:
             output_path = input_path
         
-        ### TODO: Translate to guitar tab
+        score = converter.parse(output_path)   
+        if(isinstance(score, stream.Score)):  
+            ### TODO: Make this trash ass function a little better
+            score = add_tab(score)
         
-        # Store file in memory so FastAPI can send it in the Response
-        content = output_path.read_bytes() 
+        title = score.metadata.title if score.metadata.title is not None else Path(file.filename).stem
         
-        score = converter.parse(output_path)
-        
-        # I used this before with FileResponse, since that can set the filename of the file response.
-        # However, I wanted to use Response instead, because using FileResponse means that the file 
-        #   has to persist in disk so FastAPI can send it at the end of this endpoint (i.e. We can't
-        #   use a TemporaryDirectory, because it cleans any files that are made in the temp dir
-        #   before FastAPI can send it's response).
-        # So, I used Response instead, since you can just store the xml data in memory and just send
-        #   the raw bytes as xml. 
-        #
-        # if score.metadata.title not in ['', None]:
-        #     filename = score.metadata.title + '.musicxml'  
-        # else:
-        #     filename = (Path(file.filename).stem or 'output') + '.musicxml'
-        
-        return Response(
-            content=content,
-            status_code=200, 
-            media_type="application/xml",
-        )
+        # Just for testing to read the file
+        score.write('musicxml', f'{title}.musicxml')
+        return {
+            "success": True
+        }
