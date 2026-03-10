@@ -1,0 +1,19 @@
+.description-box {
+  width: 425px;
+  padding: 1.5rem 2rem;
+  background: linear-gradient(145deg, #FFFFFF, #FFFFFF); 
+  color: #F56960;
+  border-radius: 12px;
+  text-align: center;
+  box-shadow: 0 6px 15px rgba(18, 18, 18, 0.3);
+}
+
+.description-box h2 {
+  margin: 0 0 0.5rem 0;
+  font-size: 2rem;
+}
+
+.description-box p {
+  margin: 0;
+  font-size: 1.1rem;
+}
