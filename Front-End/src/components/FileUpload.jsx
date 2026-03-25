@@ -36,19 +36,19 @@ const FileUpload = () => {
                 return;
             }
 
-            const data = await response.json();
-            if (data && data.content) {
-                const blob = new Blob([data.content], { type: "application/xml" });
-                const url = window.URL.createObjectURL(blob);
-                const link = document.createElement("a");
-                link.href = url;
-                link.download = data.filename || "converted.musicxml";
-                link.click();
-                setMessage("File converted successfully!");
-            } else {
-                setMessage("Error: Invalid response from server.");
-                console.error("Invalid response structure:", data);
-            }
+            const blob = await response.blob();
+            const disposition = response.headers.get("Content-Disposition");
+            const match = disposition?.match(/filename="(.+)"/);
+            const downloadName = match?.[1] || "converted.musicxml";
+
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = downloadName;
+            link.click();
+            window.URL.revokeObjectURL(url);
+
+            setMessage("File converted successfully!");
         } catch (error) {
             setMessage(`Error: ${error.message}`);
             console.error("Fetch error:", error);
@@ -60,7 +60,11 @@ const FileUpload = () => {
     return (
         <div>
             <form onSubmit={handleSubmit}>
-                <input type="file" accept=".mscz" onChange={handleFileChange} />
+                <input
+                    type="file"
+                    accept=".mscz,.musicxml,.xml,.png,.jpg,.jpeg"
+                    onChange={handleFileChange}
+                />
                 <button type="submit" disabled={isLoading}>
                     {isLoading ? "Converting..." : "Convert"}
                 </button>
