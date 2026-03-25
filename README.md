@@ -2,6 +2,14 @@
 
 ## run the app
 
+install the backend dependencies once:
+
+```bash
+cd homr-service/homr
+poetry install --only main
+cd ../..
+```
+
 from the project root, start the backend and frontend together with:
 
 ```bash
