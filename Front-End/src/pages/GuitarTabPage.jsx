@@ -4,7 +4,7 @@ import "../styles/GuitarTabPage.css";
 function GuitarTabPage() {
   return (
     <div className="tab-page">
-      <h2>Tab Placeholder Page</h2>
+      <h1>hello</h1>
     </div>
   );
 }

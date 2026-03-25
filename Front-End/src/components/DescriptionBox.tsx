@@ -1,7 +1,13 @@
 import React from "react";
 import "../styles/DescriptionBox.css";
 
-function DescriptionBox({}) {
+function DescriptionBox({
+  title,
+  description
+} : {
+  title: String,
+  description: String,
+}) {
   return (
     <div className="description-box">
       <h2>Welcome to Tably</h2>

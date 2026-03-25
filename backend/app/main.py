@@ -54,8 +54,17 @@ async def upload_musescore_file(file: UploadFile):
         
         title = score.metadata.title if score.metadata.title is not None else Path(file.filename).stem
         
-        # Just for testing to read the file
+        altered_path = tmp_path / f'{title}.musicxml'
+        
+        # Just for testing to inspect the file in vs code/musescore
+        score.write('musicxml', altered_path)
+        
         score.write('musicxml', f'{title}.musicxml')
-        return {
-            "success": True
-        }
+        
+        content = altered_path.read_bytes()
+                
+        return Response(
+            content,
+            status_code=200,
+            media_type='application/xml'
+        )

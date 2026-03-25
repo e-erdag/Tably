@@ -4,23 +4,27 @@ import '../styles/App.css'
 import FileDropBox from '../components/FileDropBox'
 import DescriptionBox from "../components/DescriptionBox";
 import GuitarTabPage from "./GuitarTabPage";
-
+import AlphaTabViewer from '../components/AlphaTabViewer';
 
 function Home() {
   const navigate = useNavigate();
 
-  const handleFile = (file) => {
-    console.log("Selected file:", file);
+  const handleFile = async (inputFile: File) => {
+    const res = await fetch('http://localhost:8000/upload');
+    const blob = await res.blob();
+    const outputFile = new File([blob], `${inputFile}.musicxml`, { type: 'application/xml' });
+
     navigate("/tab"); // nav to tab placeholder page
   };
 
   return (
     <div className="app-container">
       <DescriptionBox
-        title="Welcome to Table"
+        title="Welcome to Tably"
         description="Upload MuseScore files (MSCZ, MUSICXML) or images (JPG, PNG) and receive formatted guitar tabs instantly."
       />
-      <FileDropBox onFileSelect={handleFile} />
+      {/* <FileDropBox onFileSelect={handleFile} /> */}
+      <AlphaTabViewer />
     </div>
   );
 }
