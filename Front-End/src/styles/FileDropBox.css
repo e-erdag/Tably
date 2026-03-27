@@ -44,3 +44,8 @@
   color: #FFFFFFCC; 
   text-align: center;
 }
+
+
+.file-dropbox-input {
+  display: none;
+}
