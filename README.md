@@ -10,6 +10,14 @@ poetry install --only main
 cd ../..
 ```
 
+install the frontend dependencies once:
+
+```bash
+cd Front-End
+npm install
+cd ..
+```
+
 from the project root, start the backend and frontend together with:
 
 ```bash
