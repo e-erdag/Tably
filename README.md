@@ -1,6 +1,6 @@
-# tably
+# Tably
 
-## run the app
+## Run the app
 
 install the backend dependencies once:
 
@@ -35,7 +35,7 @@ if the script is not executable yet, run:
 chmod +x ./run_dev.sh
 ```
 
-## test in the browser
+## Test in the browser
 
 1. run `./run_dev.sh`
 2. open `http://localhost:5173`
@@ -43,7 +43,7 @@ chmod +x ./run_dev.sh
    `.mscz`, `.musicxml`, `.xml`, `.png`, `.jpg`, `.jpeg`
 4. the app should download a `.musicxml` file after conversion
 
-## test the backend directly
+## Test the backend directly
 
 check that the api is alive:
 
@@ -69,7 +69,7 @@ pass through an existing musicxml file:
 curl -X POST -F "file=@/full/path/to/score.musicxml" http://localhost:8000/convert --output score.musicxml
 ```
 
-## run only the backend
+## Run only the backend
 
 if you only want the api without the frontend:
 
@@ -78,7 +78,7 @@ cd homr-service/homr
 poetry run uvicorn unified_api:app --app-dir ../../Back-End --host 0.0.0.0 --port 8000
 ```
 
-## notes
+## Notes
 
 - image uploads use `homr`, so the first image request may take longer while models initialize
 - `.mscz` conversion depends on museScore being installed at `/Applications/MuseScore 4.app/Contents/MacOS/mscore`
