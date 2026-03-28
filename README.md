@@ -1,47 +1,41 @@
 # Tably
 
+Convert sheet music to guitar tab!
+
 ## Run the app
 
-install the backend dependencies once:
+Install the backend dependencies:
 
 ```bash
-cd homr-service/homr
+cd Back-End
 poetry install --only main
-cd ../..
 ```
 
-install the frontend dependencies once:
+Install frontend dependencies:
 
 ```bash
 cd Front-End
 npm install
-cd ..
 ```
 
-from the project root, start the backend and frontend together with:
+From project root, start the backend and frontend together with:
 
 ```bash
 ./run_dev.sh
 ```
 
-this starts:
+This starts:
 
 - the backend api at `http://localhost:8000`
 - the frontend dev server at `http://localhost:5173`
 
-if the script is not executable yet, run:
-
-```bash
-chmod +x ./run_dev.sh
-```
-
 ## Test in the browser
 
-1. run `./run_dev.sh`
-2. open `http://localhost:5173`
-3. upload one of these file types:
+1. Run `./run_dev.sh`
+2. Open `http://localhost:5173`
+3. Upload one of these file types:
    `.mscz`, `.musicxml`, `.xml`, `.png`, `.jpg`, `.jpeg`
-4. the app should download a `.musicxml` file after conversion
+4. Rhe app should download a `.musicxml` file after conversion
 
 ## Test the backend directly
 
@@ -71,11 +65,11 @@ curl -X POST -F "file=@/full/path/to/score.musicxml" http://localhost:8000/conve
 
 ## Run only the backend
 
-if you only want the api without the frontend:
+If you only want the api without the frontend:
 
 ```bash
-cd homr-service/homr
-poetry run uvicorn unified_api:app --app-dir ../../Back-End --host 0.0.0.0 --port 8000
+cd Back-End
+poetry run python main.py
 ```
 
 ## Notes

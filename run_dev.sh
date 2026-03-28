@@ -3,8 +3,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BACKEND_DIR="$ROOT_DIR/homr-service/homr"
-API_DIR="$ROOT_DIR/Back-End"
+APP_DIR="$ROOT_DIR/Back-End"
 FRONTEND_DIR="$ROOT_DIR/Front-End"
 
 cleanup() {
@@ -24,8 +23,8 @@ if ! command -v npm >/dev/null 2>&1; then
 fi
 
 (
-  cd "$BACKEND_DIR"
-  poetry run uvicorn unified_api:app --app-dir "$API_DIR" --host 0.0.0.0 --port 8000
+  cd "$APP_DIR"
+  poetry run uvicorn app.main:app --app-dir "$APP_DIR" --host 0.0.0.0 --port 8000 --reload
 ) &
 BACKEND_PID=$!
 (

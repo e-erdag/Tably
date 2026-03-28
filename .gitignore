@@ -1,9 +1,21 @@
+# Frontend 
 node_modules/
 dist/
-.env
+.vite/
+
+# Backend
+.venv/
 __pycache__/
+
+.env
+
+# In case we forget to delete test files
+*.musicxml
+*.mscz
+*.xml
+
 *.pyc
 *.pyo
 *.pyd
 .pytest_cache/
-test_files
+test_files/

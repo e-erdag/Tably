@@ -1,37 +1,4 @@
-// import React from "react";
-// import '../styles/FileDropBox.css'
-
-
-// function FileDropBox({ onFileSelect }) {
-//   const handleChange = (event) => {
-//     const file = event.target.files[0];
-//     if (file) {
-//       onFileSelect(file);
-//     }
-//   };
-
-//  return (
-//     <div className="file-dropbox-container">
-//       <label className="file-dropbox-label" htmlFor="fileDropBox">
-//         Upload Your Music File
-//       </label>
-//       <input
-//         type="file"
-//         id="fileDropBox"
-//         className="file-dropbox-input"
-//         onChange={handleChange}
-//         accept=".mscz,.musicxml,.jpg,.png"
-//       />
-//       <p className="file-dropbox-hint">
-//         Supported formats: MSCZ, MUSICXML, JPG, PNG.
-//       </p>
-//     </div>
-//   );
-// }
-
-// export default FileDropBox;
-
-import React, { useState } from "react";
+import { useState } from "react";
 import '../styles/FileDropBox.css';
 
 function FileDropBox({ onFileConverted }) {
@@ -49,7 +16,6 @@ function FileDropBox({ onFileConverted }) {
       const formData = new FormData();
       formData.append("file", file);
 
-      // Call your backend API
       const response = await fetch("http://localhost:8000/convert", {
         method: "POST",
         body: formData,
