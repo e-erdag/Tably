@@ -1,5 +1,4 @@
 import asyncio
-import importlib.util
 import logging
 import os
 import shutil
@@ -14,10 +13,9 @@ from pydantic import BaseModel
 
 from .convert_mscz_to_XML import convert_mscz_to_musicxml_file
 
-from music21 import converter, stream
+# from music21 import converter, stream
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
-import homr
 
 from .homr_api import (
     ensure_homr_models_ready,

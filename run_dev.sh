@@ -24,7 +24,7 @@ fi
 
 (
   cd "$APP_DIR"
-  poetry run uvicorn unified_api:app --app-dir "$APP_DIR" --host 0.0.0.0 --port 8000
+  poetry run uvicorn app.main:app --app-dir "$APP_DIR" --host 0.0.0.0 --port 8000 --reload
 ) &
 BACKEND_PID=$!
 (
