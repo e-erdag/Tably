@@ -1,0 +1,5 @@
+{
+    "python.analysis.extraPaths": [
+        "./homr-service/homr"
+    ]
+}

@@ -1,24 +1,24 @@
 # Tably
 
+Convert sheet music to guitar tab!
+
 ## Run the app
 
-install the backend dependencies once:
+Install the backend dependencies:
 
 ```bash
 cd homr-service/homr
 poetry install --only main
-cd ../..
 ```
 
-install the frontend dependencies once:
+Install frontend dependencies:
 
 ```bash
 cd Front-End
 npm install
-cd ..
 ```
 
-from the project root, start the backend and frontend together with:
+From project root, start the backend and frontend together with:
 
 ```bash
 ./run_dev.sh

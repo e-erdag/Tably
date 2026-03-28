@@ -8,18 +8,11 @@ import GuitarTabPage from "./GuitarTabPage";
 function Home() {
   const navigate = useNavigate();
 
-  const handleFile = async (inputFile: File) => {
-    const res = await fetch('http://localhost:8000/upload');
-    const blob = await res.blob();
-    const outputFile = new File([blob], `${inputFile}.musicxml`, { type: 'application/xml' });
+  const handleFile = async (converted: { blob: Blob, name: string }) => {
+    const file = new File([converted.blob], converted.name)
 
-    navigate("/tab"); // nav to tab placeholder page
-  
+    navigate("/tab", { state: { file } });
   }
-  // This function is called when the file is converted
-  const handleFileConverted = (convertedFile) => {
-    navigate("/tab", { state: { file: convertedFile } });
-  };
 
   return (
     <div className="app-container">
@@ -27,7 +20,7 @@ function Home() {
         title="Welcome to Tably"
         description="Upload MuseScore files (MSCZ, MUSICXML) or images (JPG, PNG) and receive formatted guitar tabs instantly."
       />
-      <FileDropBox onFileConverted={handleFileConverted} />
+      <FileDropBox onFileConverted={handleFile} />
     </div>
   );
 }

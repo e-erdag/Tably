@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AlphaTabApi, type json } from '@coderline/alphatab';
 
-export default function AlphaTabViewer() {
+export default function AlphaTabViewer({ file }: { file: File }) {
   const mainRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -10,7 +10,6 @@ export default function AlphaTabViewer() {
   useEffect(() => {
     const api = new AlphaTabApi(mainRef.current!, {
       core: {
-        file: '../../Ode to Joy.musicxml',
         fontDirectory: '/font/'
       },
       player: {
@@ -24,6 +23,14 @@ export default function AlphaTabViewer() {
 
     setApi(api);
 
+    let cancelled = false;
+    const loadFile = async () => {
+      const buffer = await file.arrayBuffer();
+      if(!cancelled)
+        api.load(buffer);
+    };
+    loadFile();
+
     api.renderStarted.on(() => {
       setIsLoading(true);
     });
@@ -33,10 +40,10 @@ export default function AlphaTabViewer() {
     });
 
     return () => {
-      console.log('destroy', mainRef, api);
+      cancelled = true;
       api.destroy();
     }
-  }, []);
+  }, [file]);
 
 
 
