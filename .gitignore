@@ -10,3 +10,8 @@ __pycache__/
 .env
 *.musicxml
 
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+test_files/

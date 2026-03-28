@@ -44,3 +44,61 @@
   color: #FFFFFFCC; 
   text-align: center;
 }
+
+
+.file-dropbox-input {
+  display: none;
+}
+
+
+/* awaiting the convertion */
+.file-dropbox-loading {
+  margin-top: 1rem;
+  font-size: 0.95rem;
+  color: #FFFFFF; 
+  text-align: center;
+  font-weight: bold;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  transition: background 0.2s ease;
+}
+
+/* Download link container */
+.converted-file-container {
+  margin-top: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* Download button styled like FileDropBox label */
+.converted-file-container a {
+  background-color: #F56960; 
+  color: #FFFFFF;
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: bold;
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.converted-file-container a:hover {
+  background-color: #173753;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(18, 18, 18, 0.4);
+}
+
+/* Optional: message above download button */
+.converted-file-container p {
+  font-size: 0.95rem;
+  color: #FFFFFFCC;
+  text-align: center;
+  margin: 0;
+}

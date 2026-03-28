@@ -1,10 +1,9 @@
-import { useState } from 'react'
+import { useState } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
-import '../styles/App.css'
-import FileDropBox from '../components/FileDropBox'
+import '../styles/App.css';
+import FileDropBox from '../components/FileDropBox';
 import DescriptionBox from "../components/DescriptionBox";
 import GuitarTabPage from "./GuitarTabPage";
-import AlphaTabViewer from '../components/AlphaTabViewer';
 
 function Home() {
   const navigate = useNavigate();
@@ -15,6 +14,11 @@ function Home() {
     const outputFile = new File([blob], `${inputFile}.musicxml`, { type: 'application/xml' });
 
     navigate("/tab"); // nav to tab placeholder page
+  
+  }
+  // This function is called when the file is converted
+  const handleFileConverted = (convertedFile) => {
+    navigate("/tab", { state: { file: convertedFile } });
   };
 
   return (
@@ -23,8 +27,7 @@ function Home() {
         title="Welcome to Tably"
         description="Upload MuseScore files (MSCZ, MUSICXML) or images (JPG, PNG) and receive formatted guitar tabs instantly."
       />
-      {/* <FileDropBox onFileSelect={handleFile} /> */}
-      <AlphaTabViewer />
+      <FileDropBox onFileConverted={handleFileConverted} />
     </div>
   );
 }
@@ -32,13 +35,13 @@ function Home() {
 function App() {
   return (
     <>
-      <header className = "tably-header">
+      <header className="tably-header">
         <h1>Tably</h1>
       </header>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/tab" element={<GuitarTabPage />} />
-        </Routes>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/tab" element={<GuitarTabPage />} />
+      </Routes>
     </>
   );
 }
