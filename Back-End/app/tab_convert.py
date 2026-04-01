@@ -42,21 +42,22 @@ def add_staff_details(score: stream.Score):
     first_measure.staffLines = 6
     
     # Keep the score in memory
-    xml_string = score.write('musicxml').read_text()
+    xml_string = score.write('musicxml').read_text(encoding='UTF-8')
     
     root = ET.fromstring(xml_string)
-        
-    for attributes in root.iter(f'attributes'):
-        staff_details = attributes.find(f'staff-details')
-        if staff_details is not None:
-            for line, step, octave in E_STANDARD_GUITAR:
-                st = ET.SubElement(staff_details, 'staff-tuning')
-                st.set('line', str(line))
-                ET.SubElement(st, 'tuning-step').text = step
-                ET.SubElement(st, 'tuning-octave').text = octave
-    
+    attributes = next(root.iter(f'attributes'))
+
+    staff_details = attributes.find(f'staff-details')
+    if staff_details is not None:
+        for line, step, octave in E_STANDARD_GUITAR:
+            st = ET.SubElement(staff_details, 'staff-tuning')
+            st.set('line', str(line))
+            ET.SubElement(st, 'tuning-step').text = step
+            ET.SubElement(st, 'tuning-octave').text = octave
+
+
     tree = ET.ElementTree(root)
-                
+    ET.indent(tree, '  ')            
     return tree
 
 def closest_string(n: note.Note):
@@ -75,7 +76,8 @@ def closest_string(n: note.Note):
 
     return (best_string, fret)
 
-
+# Breaks down with more complex songs. Will probably need to update
+# to create a fresh score instead of updating the old one
 def get_musicxml_tab(xml_path: Path | str):
     res = converter.parse(xml_path, format='musicxml')
     
@@ -96,15 +98,12 @@ def get_musicxml_tab(xml_path: Path | str):
     # default_ts = meter.TimeSignature('4/4')
     # computed_ts = score.flatten().getElementsByClass(meter.TimeSignature).first() 
     
-    # ts = computed_ts if computed_ts else default_ts
-    
-    # print(bpm, f"{ts.numerator}/{ts.denominator}")                        
+    # ts = computed_ts if computed_ts else default_ts                       
     
     notes = part.flatten().notesAndRests
     for n in notes:
         if(isinstance(n, note.Note)):
             string, fret = closest_string(n)
-            print(n.nameWithOctave, n.duration.type, string, fret)
             
             # This part makes alphatab render weirdly. I'll figure out why later
             n.articulations.append(articulations.StringIndication(string))

@@ -6,6 +6,8 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+import unicodedata
+
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
@@ -85,6 +87,9 @@ def _convert_upload_to_musicxml(input_path: str, extension: str) -> tuple[str, b
         return convert_mscz_to_musicxml_file(input_path)
     raise ValueError(f"Unsupported extension: {extension}")
 
+# Clean file names, which may have problem characters like '-'
+def sanitize_filename(filename: str) -> str:
+    return unicodedata.normalize('NFKD', filename).encode('ascii', 'ignore').decode('ascii')
 
 @app.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
@@ -122,7 +127,7 @@ async def convert_file(file: UploadFile = File(...)) -> Response:
             await file.close()
 
         # send the result back as a downloadable musicxml file.
-        output_name = Path(file.filename).stem + ".musicxml"
+        output_name = sanitize_filename(Path(file.filename).stem + ".musicxml")
         headers = {"Content-Disposition": f'attachment; filename="{output_name}"'}
 
         logger.info("Converted %s to %s", file.filename, output_path)
