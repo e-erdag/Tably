@@ -13,17 +13,19 @@ function GuitarTabPage() {
   }
 
   return (
-    <div className="tab-page">
-      <button onClick={() => navigate('/')} >Return</button>
-      <h2>Your file is ready!</h2>
-      <a
-        href={URL.createObjectURL(convertedFile)}
-        download={convertedFile.name}
-      >
-        Download Converted File
-      </a>
+    <>
+      <div className="tab-page">
+        <button onClick={() => navigate('/')} >Return</button>
+        <h2>Your file is ready!</h2>
+        <a
+          href={URL.createObjectURL(convertedFile)}
+          download={convertedFile.name}
+        >
+          Download Converted File
+        </a>
+      </div>
       <AlphaTabViewer file={convertedFile}/>
-    </div>
+    </>
   );
 }
 

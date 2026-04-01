@@ -6,14 +6,17 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+import unicodedata
+
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-from .convert_mscz_to_XML import convert_mscz_to_musicxml_file
-
-# from music21 import converter, stream
+from .xml_conversions import (
+    convert_mscz_to_musicxml_file,
+    _read_existing_musicxml
+)
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 
@@ -40,7 +43,7 @@ app = FastAPI(
 # Update later to allow origin from whatever domain we register
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",
+    allow_origin_regex=r"https://(localhost|127\.0\.0\.1):\d+",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -68,13 +71,6 @@ def _validate_upload(file: UploadFile) -> str:
 
     return extension
 
-
-def _read_existing_musicxml(input_path: str) -> tuple[str, bytes]:
-    # return musicxml files as-is without converting them.
-    with open(input_path, "rb") as musicxml_file:
-        return input_path, musicxml_file.read()
-
-
 async def _prepare_for_conversion(extension: str) -> None:
     # only image uploads need the homr models to be ready first.
     if is_supported_image_extension(extension):
@@ -91,6 +87,9 @@ def _convert_upload_to_musicxml(input_path: str, extension: str) -> tuple[str, b
         return convert_mscz_to_musicxml_file(input_path)
     raise ValueError(f"Unsupported extension: {extension}")
 
+# Clean file names, which may have problem characters like '-'
+def sanitize_filename(filename: str) -> str:
+    return unicodedata.normalize('NFKD', filename).encode('ascii', 'ignore').decode('ascii')
 
 @app.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
@@ -128,7 +127,7 @@ async def convert_file(file: UploadFile = File(...)) -> Response:
             await file.close()
 
         # send the result back as a downloadable musicxml file.
-        output_name = Path(file.filename).stem + ".musicxml"
+        output_name = sanitize_filename(Path(file.filename).stem + ".musicxml")
         headers = {"Content-Disposition": f'attachment; filename="{output_name}"'}
 
         logger.info("Converted %s to %s", file.filename, output_path)
