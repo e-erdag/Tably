@@ -102,3 +102,9 @@
   text-align: center;
   margin: 0;
 }
+
+.file-dropbox-error {
+    color: #ffffff;
+    font-size: 1.2rem;
+    text-align: center;
+}

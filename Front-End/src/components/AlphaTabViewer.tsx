@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { AlphaTabApi, type json } from '@coderline/alphatab';
+import { TabRhythmMode, AlphaTabApi, type json } from '@coderline/alphatab';
+import '../styles/AlphaTabViewer.css'
 
 export default function AlphaTabViewer({ file }: { file: File }) {
   const mainRef = useRef<HTMLDivElement>(null);
@@ -9,6 +10,11 @@ export default function AlphaTabViewer({ file }: { file: File }) {
 
   useEffect(() => {
     const api = new AlphaTabApi(mainRef.current!, {
+      notation: {
+        rhythmMode: TabRhythmMode.Hidden // Used to hide stem lines
+        // Not granular, so will need to be changed if we want to display
+        // sheet music next to guitar tab. 
+      },
       core: {
         fontDirectory: '/font/'
       },
@@ -48,31 +54,29 @@ export default function AlphaTabViewer({ file }: { file: File }) {
 
 
   return (
-    <>
-       <div className="at-wrap">
-        <div 
-          className='at-overlay'
-          style={{ 
-              display: isLoading ? 'flex' : 'none'
-          }}
-        >
-          <div className='at-overlay-content' >
-            Music sheet is loading...
-          </div>
-        </div>
-        <div className="at-content">
-          <div className="at-sidebar">
-            Track selector will go here
-          </div>
-          <div className="at-viewport" ref={viewportRef}>
-              {/* <div className="at-main"></div> */}
-              <div className="at-main" ref={mainRef}></div>
-          </div>
-        </div>
-        <div className="at-controls">
-          Controls will go here
+    <div className="at-wrap">
+      <div 
+        className='at-overlay'
+        style={{ 
+            display: isLoading ? 'flex' : 'none'
+        }}
+      >
+        <div className='at-overlay-content' >
+          Music sheet is loading...
         </div>
       </div>
-    </>
+      <div className="at-content">
+        <div className="at-sidebar">
+          Track selector will go here
+        </div>
+        <div className="at-viewport" ref={viewportRef}>
+            {/* <div className="at-main"></div> */}
+            <div className="at-main" ref={mainRef}></div>
+        </div>
+      </div>
+      <div className="at-controls">
+        Controls will go here
+      </div>
+    </div>
   );
 }
