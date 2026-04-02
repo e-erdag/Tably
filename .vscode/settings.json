@@ -1,5 +1,6 @@
 {
     "python.analysis.extraPaths": [
         "./homr-service/homr"
-    ]
+    ],
+    "python-envs.defaultEnvManager": "ms-python.python:system"
 }

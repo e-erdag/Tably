@@ -1,8 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { TabRhythmMode, AlphaTabApi, type json } from '@coderline/alphatab';
-import '../styles/AlphaTabViewer.css'
+import '../styles/AlphaTabViewer2.css'
 
-export default function AlphaTabViewer({ file }: { file: File }) {
+//interface containg all the data coming from GuitarTabPage
+interface AlphaTabViewerProps {
+  file: File; //currently selected file to view
+  files: File[]; //all uploaded files
+  currentIndex: number; //currently selected file
+  setCurrentIndex: (index: number) => void; //function that changed current file
+  convertingIndices?: number[]; //for keep track of files in process of converting
+}
+
+export default function AlphaTabViewer({ file, files, currentIndex, setCurrentIndex, convertingIndices }: AlphaTabViewerProps) {
+  
   const mainRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -25,12 +35,13 @@ export default function AlphaTabViewer({ file }: { file: File }) {
         scrollElement: viewportRef.current!,
         soundFont: '/soundfont/sonivox.sf2',
       }
-    } as json.SettingsJson);
+    });
 
     setApi(api);
 
     let cancelled = false;
     const loadFile = async () => {
+      setIsLoading(true);
       const buffer = await file.arrayBuffer();
       if(!cancelled)
         api.load(buffer);
@@ -66,12 +77,54 @@ export default function AlphaTabViewer({ file }: { file: File }) {
         </div>
       </div>
       <div className="at-content">
-        <div className="at-sidebar">
-          Track selector will go here
+        {/* menu for selecting between uploaded tracks */}
+        <div className="at-sidebar"> 
+          {files.map((f, index) => (
+          <button
+            key={index}
+            onClick={() => setCurrentIndex(index)} //select file
+            style={{
+              margin: '0.3rem',
+              padding: '0.5rem',
+              borderRadius: '6px',
+              border: 'none',
+              cursor: 'pointer',
+              background: index === currentIndex ? '#F56960' : '#FFFFFF33',
+              color: 'white',
+              width: '90%'
+            }}
+          >
+            {convertingIndices?.includes(index)
+              ? "Loading…"  // if file is still converting
+              : f.name.length > 10
+                ? f.name.slice(0, 10) + "..."
+                : f.name
+            }
+          </button>
+        ))}
         </div>
+        
         <div className="at-viewport" ref={viewportRef}>
-            {/* <div className="at-main"></div> */}
-            <div className="at-main" ref={mainRef}></div>
+          {/* <div className="at-main"></div> */}
+          <div className="at-main" ref={mainRef}></div>
+
+          {/*if current file still converting*/}
+          {convertingIndices?.includes(currentIndex) && (
+            <div className="at-overlay" style={{ display: 'flex' }}>
+              <div className="at-overlay-content">
+                Waiting for convertion...
+              </div>
+            </div>
+          )}
+
+          {/*If current file is being loaded by alphatab*/}
+          {isLoading && !convertingIndices?.includes(currentIndex) && (
+            <div className="at-overlay" style={{ display: 'flex' }}>
+              <div className="at-overlay-content">
+                Loading Music Sheet...
+              </div>
+            </div>
+          )}
         </div>
       </div>
       <div className="at-controls">
