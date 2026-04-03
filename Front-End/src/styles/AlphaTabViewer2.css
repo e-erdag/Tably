@@ -1,5 +1,5 @@
 .at-wrap {
-  width: 90vw;
+  /* width: 100vw; */
   height: 80vh;
   margin: 3rem auto;
   display: flex;
@@ -45,7 +45,7 @@
 
 /*sidebar area*/
 .at-sidebar {
-  width: 80px;             
+  width: 150px;             
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -78,4 +78,19 @@
   text-align: center;
   background: rgba(0,0,0,0.2);
   color: white;
+}
+
+/* Styling for cursor that moves throughout song*/
+.at-cursor-beat,
+.at-cursor-note {
+  position: absolute !important;
+  background: black !important;
+  width: 100px !important;
+  opacity: 1 !important;
+  z-index: 9999 !important;
+}
+
+/* Make the highlight more noticeable too (optional) */
+.at-cursor-bar {
+  background: rgba(0, 0, 0, 0.15) !important;
 }

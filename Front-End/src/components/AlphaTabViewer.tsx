@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { TabRhythmMode, AlphaTabApi, type json } from '@coderline/alphatab';
 import '../styles/AlphaTabViewer2.css'
+import AlphaTabControls from "./AlphaTabControls";
+
 
 //interface containg all the data coming from GuitarTabPage
 interface AlphaTabViewerProps {
@@ -56,8 +58,20 @@ export default function AlphaTabViewer({ file, files, currentIndex, setCurrentIn
       setIsLoading(false);
     });
 
+
+    //for handling user moving cursor via clicks
+    const unsubNoteUp = api.noteMouseUp.on((note) => {
+      if (note)  api.playBeat(note.beat);
+    });
+
+    const unsubBeatUp = api.beatMouseUp.on((beat) => {
+      if (beat) api.playBeat(beat);
+    });
+
     return () => {
       cancelled = true;
+      unsubNoteUp();
+      unsubBeatUp();
       api.destroy();
     }
   }, [file]);
@@ -107,7 +121,6 @@ export default function AlphaTabViewer({ file, files, currentIndex, setCurrentIn
         <div className="at-viewport" ref={viewportRef}>
           {/* <div className="at-main"></div> */}
           <div className="at-main" ref={mainRef}></div>
-
           {/*if current file still converting*/}
           {convertingIndices?.includes(currentIndex) && (
             <div className="at-overlay" style={{ display: 'flex' }}>
@@ -128,7 +141,7 @@ export default function AlphaTabViewer({ file, files, currentIndex, setCurrentIn
         </div>
       </div>
       <div className="at-controls">
-        Controls will go here
+        <AlphaTabControls api={api} />
       </div>
     </div>
   );
