@@ -7,8 +7,15 @@ from music21 import (
     interval, 
     note, 
     articulations, 
+    meter, 
+    key,
+    metadata,
+    tempo,
+    instrument,
+    chord
 )
 import math
+from dataclasses import dataclass, field
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -31,12 +38,30 @@ E_STANDARD_GUITAR = [
     (6, 'E', '4'),
 ]
 
-def add_staff_details(score: stream.Score):
+@dataclass
+class ScoreInfo:
+    title: str = 'Unknown'
+    composer: str = 'Unknown'
+    key_signature: key.KeySignature = field(default_factory=lambda: key.KeySignature(0))
+    # Not being used currently, but could be useful for figuring out 
+    #  fret placements or chord placements
+    time_signature: meter.TimeSignature = field(default_factory=lambda: meter.TimeSignature('4/4'))
+
+def add_staff_details(score: stream.Score) -> ET.ElementTree:
+    """ Manually inject \<staff-details\> element into the xml tree 
+    so that the file can be interpreted as a guitar tab by alphaTab
+
+    Args:
+        score (stream.Score): The music21 score to be converted into an xml tree
+        and be injected with \<staff-details\>
+
+    Returns:
+        ET.ElementTree: The xml tree with \<staff-details\> 
+    """
     part = score.parts[0]
 
     first_measure = part.getElementsByClass(stream.Measure)[0]
     
-    first_measure.remove(first_measure.getElementsByClass(clef.Clef)[0])
     first_measure.insert(0, clef.TabClef())
     
     first_measure.staffLines = 6
@@ -57,11 +82,15 @@ def add_staff_details(score: stream.Score):
 
 
     tree = ET.ElementTree(root)
+    # Make the file look nice at the end
     ET.indent(tree, '  ')            
     return tree
 
-def closest_string(n: note.Note):
-    p = n.pitch
+def closest_string(n: note.Note | pitch.Pitch):
+    if isinstance(n, note.Note):
+        p = n.pitch
+    elif isinstance(n, pitch.Pitch):
+        p = n
     
     best_string = 6
     best_semitone = 100
@@ -76,11 +105,49 @@ def closest_string(n: note.Note):
 
     return (best_string, fret)
 
-# Breaks down with more complex songs. Will probably need to update
-# to create a fresh score instead of updating the old one
-def get_musicxml_tab(xml_path: Path | str):
-    res = converter.parse(xml_path, format='musicxml')
+
+
+def get_score_info(score: stream.Score, xml_root: ET.Element) -> ScoreInfo:
+    score_info = ScoreInfo()
+
+    credits = {}
+    for credit in xml_root.findall('credit'):
+        ct = credit.find('credit-type')
+        cw = credit.find('credit-words')
+        if ct is not None and cw is not None:
+            credits[ct.text] = cw.text
     
+    if not score.metadata.title:
+        if credits.get('title'):
+            score_info.title = credits['title']
+    else:
+        score_info.title = score.metadata.title
+
+    if not score.metadata.composer:
+        if credits.get('composer'):
+            score_info.composer = credits['composer']
+    else:
+        score_info.composer = score.metadata.composer
+        
+    
+    computed_ts = score.flatten().getElementsByClass(meter.TimeSignature).first() 
+    
+    if computed_ts:
+        score_info.time_signature = computed_ts                        
+    
+    ks = score.recurse().getElementsByClass('KeySignature').first()
+    if not ks:
+        ks  = score.analyze('key')
+    
+    if ks:
+        score_info.key_signature = ks
+    
+    return score_info
+
+def parse_score(xml_path: Path | str):
+    score_info = ScoreInfo()
+    
+    res = converter.parse(xml_path, format='musicxml')
     if isinstance(res, stream.Score):
         score = res
     elif isinstance(res, stream.Part):
@@ -91,24 +158,90 @@ def get_musicxml_tab(xml_path: Path | str):
     else:
         raise ValueError(f'Result after music21 parsing is not of type (Score | Path | Opus): {type(res).__name__}')
     
-    part = score.parts[0]
+    xml_tree = ET.parse(xml_path)
+    xml_root = xml_tree.getroot()
     
-    # mark = score.flatten().getElementsByClass(tempo.MetronomeMark).first()       
-    # bpm = mark.number if mark else 120
-    # default_ts = meter.TimeSignature('4/4')
-    # computed_ts = score.flatten().getElementsByClass(meter.TimeSignature).first() 
+    score_info = get_score_info(score, xml_root)
     
-    # ts = computed_ts if computed_ts else default_ts                       
-    
-    notes = part.flatten().notesAndRests
-    for n in notes:
-        if(isinstance(n, note.Note)):
-            string, fret = closest_string(n)
-            
-            # This part makes alphatab render weirdly. I'll figure out why later
-            n.articulations.append(articulations.StringIndication(string))
-            n.articulations.append(articulations.FretIndication(fret))
-            
-    tree = add_staff_details(score)
+    return score, score_info
 
-    return tree
+# Breaks down with more complex songs. Will probably need to update
+# to create a fresh score instead of updating the old one
+def get_musicxml_tab(xml_path: Path | str):
+    score, score_info = parse_score(xml_path)
+    old_part = score.parts[0]
+    
+    tab = stream.Score()
+    tab.insert(0, metadata.Metadata())
+    tab.metadata.title = score_info.title
+    tab.metadata.composer = score_info.composer
+    
+    part = stream.Part()
+    part.insert(0, instrument.Guitar())
+    
+    old_measures: list[stream.Measure] = list(old_part.getElementsByClass('Measure'))
+
+    # The indices of the notes in a chord (besides the first one)
+    chord_indices: list[int] = []
+    note_index = 0
+    for i, old_measure in enumerate(old_measures):
+        measure = stream.Measure(number=i+1)
+        if i+1 == 1:
+            measure.insert(0, score_info.time_signature)
+            measure.insert(0, score_info.key_signature)
+
+        # Insert the tempo marking (bpm) into the measure
+        mm = old_measure.getElementsByClass('MetronomeMark').first()
+        if mm:
+            quarter_bpm = mm.getQuarterBPM()
+            new_mm = tempo.MetronomeMark(number=quarter_bpm)
+            measure.insert(0, new_mm)
+
+        for ele in old_measure.recurse().notesAndRests:
+            if isinstance(ele, chord.Chord):
+                for n_i, n in enumerate(ele.notes):
+                    string, fret = closest_string(n)
+                    n.articulations.append(articulations.StringIndication(string))
+                    n.articulations.append(articulations.FretIndication(fret))            
+                
+                    # Preserve the offset between notes in a chord
+                    # For example, if offset = 0 for the first note, offset = 0
+                    #  for every other note in the chord.
+                    # This helps alphatab render the chord properly 
+                    measure.insert(ele.offset, n)
+
+                    if n_i > 0:
+                        chord_indices.append(note_index)
+
+                    note_index += 1
+
+            elif isinstance(ele, note.Note):
+                string, fret = closest_string(ele)
+                
+                ele.articulations.append(articulations.StringIndication(string))
+                ele.articulations.append(articulations.FretIndication(fret))
+
+                measure.append(ele)
+
+                note_index += 1
+            elif isinstance(ele, note.Rest):
+                measure.append(ele)
+
+                note_index += 1
+    
+        part.append(measure)
+    
+    tab.append(part)
+            
+    tree = add_staff_details(tab)
+
+    root: ET.Element = tree.getroot()
+
+    # Inject <chord /> into all of the marked "chord" notes manually
+    #  so that it renders properly on alphaTab
+    all_notes = root.findall('.//note')
+    for i in chord_indices:
+        n = all_notes[i]
+        n.insert(0, ET.Element('chord'))   
+
+    return ET.ElementTree(root)
