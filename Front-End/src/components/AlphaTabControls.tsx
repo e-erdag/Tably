@@ -60,7 +60,7 @@ export default function AlphaTabControls({
 	const instruments = [
 		{ name: "Piano", program: 0 },
 		{ name: "Acoustic Guitar", program: 24 },
-		{ name: "Steel Guitar", program: 25 },
+		// { name: "Steel Guitar", program: 25 },
 		{ name: "Bass", program: 32 },
 		{ name: "Drums", program: 115 },
 	];
@@ -85,68 +85,58 @@ export default function AlphaTabControls({
 		return "🎵";
 	};
 
+	const speeds = [1, 1.5, 2];
+
+	const cycleSpeed = () => {
+		const currentIndex = speeds.indexOf(speed);
+		const nextIndex = (currentIndex + 1) % speeds.length;
+		const nextSpeed = speeds[nextIndex];
+
+		changeSpeed(nextSpeed);
+	};
+
 	return (
-		<div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-			{/* Playback controls */}
-			<div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-				{/* buttons for play/stop, changing speed, and metronome */}
-				<button onClick={togglePlay}>{isPlaying ? "Pause" : "Play"}</button>
-				<button onClick={stop}>Stop</button>
-
-				<button onClick={() => changeSpeed(1)}>1x</button>
-				<button onClick={() => changeSpeed(1.5)}>1.5x</button>
-				<button onClick={() => changeSpeed(2)}>2x</button>
-
-				<button onClick={toggleMetronome}>
-					Metronome {metronomeOn ? "On" : "Off"}
-				</button>
-
-				<span>Speed: {speed}×</span>
-			</div>
-
-			{/* Track list with instrument selector */}
-			<div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", marginTop: "0.5rem" }}>
+		<div className="controls-bar">
+			{/* LEFT: Track selectors */}
+			<div className="track-inline">
 				{tracks.map((track, index) => {
-					const selectedProgram = trackPrograms[index] ?? track.playbackInfo.program ?? 0;
-					const icon = getIconFromProgram(selectedProgram);
+					const selectedProgram =
+						trackPrograms[index] ?? track.playbackInfo.program ?? 0;
 
 					return (
-						<div key={index} style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-							{/* Track button */}
+						<div key={index} className="track-inline-item">
 							<button
 								onClick={async () => {
 									if (!api) return;
 									api.stop();
 
-									track.playbackInfo.program = trackPrograms[index] ?? track.playbackInfo.program; //apply chosen track
-									await reloadFile(); // reload sheet with selected programs
+									track.playbackInfo.program =
+										trackPrograms[index] ?? track.playbackInfo.program;
+
+									await reloadFile();
 									setActiveTrack(index);
 									setIsPlaying(true);
 								}}
-								style={{
-									padding: "0.4rem 0.7rem",
-									borderRadius: "6px",
-									border: "none",
-									cursor: "pointer",
-									background: activeTrack === index ? "#F56960" : "#FFFFFF22",
-									color: "white",
-								}}
+								className={`track-button ${
+									activeTrack === index ? "active" : ""
+								}`}
 							>
-								{getIconFromProgram(trackPrograms[index] ?? track.playbackInfo.program)} {track.name}
+								{getIconFromProgram(selectedProgram)} {track.name}
 							</button>
 
-							{/* Instrument selector */}
 							<select
-								value={trackPrograms[index] ?? track.playbackInfo.program}
+								value={selectedProgram}
 								onChange={async (e) => {
 									const newProgram = Number(e.target.value);
-									setTrackPrograms(prev => ({ ...prev, [index]: newProgram }));
+									setTrackPrograms((prev) => ({
+										...prev,
+										[index]: newProgram,
+									}));
 
-									// Apply new program and reload the file
 									await reloadFile();
 								}}
 							>
-								{instruments.map(inst => (
+								{instruments.map((inst) => (
 									<option key={inst.program} value={inst.program}>
 										{inst.name}
 									</option>
@@ -156,6 +146,29 @@ export default function AlphaTabControls({
 					);
 				})}
 			</div>
+
+			{/* CENTER: Playback controls */}
+			<div className="button-group center">
+				<button onClick={togglePlay}>
+					{isPlaying ? "Pause" : "Play"}
+				</button>
+
+				<button onClick={stop}>Reset</button>
+
+				<button onClick={cycleSpeed}>
+					{speed}×
+				</button>
+
+				<button
+					onClick={toggleMetronome}
+					className={`metronome-btn ${metronomeOn ? "active" : ""}`}
+				>
+					Metronome
+				</button>
+			</div>
+
+			{/* RIGHT: empty spacer (balances layout) */}
+			<div className="spacer" />
 		</div>
 	);
 }

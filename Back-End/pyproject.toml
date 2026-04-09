@@ -3,13 +3,13 @@ name = "back-end"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.12.3,<3.13"
+requires-python = ">=3.11,<3.13"
 dependencies = [
     "defusedxml>=0.7.1",
     "fastapi>=0.133.1",
     "homr>=0.6.2",
     "music21>=9.9.1",
-    "onnxruntime>=1.24.4",
+    "onnxruntime>=1.22.1",
     "python-multipart>=0.0.22",
     "uvicorn>=0.41.0",
 ]
