@@ -29,6 +29,16 @@ OPEN_STRING_PITCHES = {
     6: pitch.Pitch('E2'), # 'E'
 }
 
+E_STANDARD_MIDI = {
+    1: 64, # E4
+    2: 59, # B3
+    3: 55, # G3
+    4: 50, # D3
+    5: 45, # A2
+    6: 40  # E2 
+}
+MAX_FRET = 24
+
 E_STANDARD_GUITAR = [
     (1, 'E', '2'),
     (2, 'A', '2'),
@@ -46,6 +56,11 @@ class ScoreInfo:
     # Not being used currently, but could be useful for figuring out 
     #  fret placements or chord placements
     time_signature: meter.TimeSignature = field(default_factory=lambda: meter.TimeSignature('4/4'))
+
+@dataclass(frozen=True)
+class StringFret:
+    string: int = 6
+    fret: int = 0
 
 def add_staff_details(score: stream.Score) -> ET.ElementTree:
     """ Manually inject \<staff-details\> element into the xml tree 
@@ -86,6 +101,61 @@ def add_staff_details(score: stream.Score) -> ET.ElementTree:
     ET.indent(tree, '  ')            
     return tree
 
+def get_frets(midi_pitch: int) -> list[StringFret]:
+    string_frets = []
+    for string, open_pitch in E_STANDARD_MIDI.items():
+        fret = midi_pitch - open_pitch
+        if 0 <= fret <= MAX_FRET:
+            string_frets.append(StringFret(string, fret))
+    return string_frets
+
+def cost(prev: StringFret, curr: StringFret) -> float:
+    fret_dist = abs(prev.fret - curr.fret)
+    string_dist = abs(prev.string - curr.string)
+    
+    open = -2 if curr.fret == 0 else 0
+    
+    return fret_dist * 2 + string_dist + open
+
+def viterbi(midi_pitches: list[int]) -> list[StringFret]:
+    if not midi_pitches: return []
+    
+    candidates = [get_frets(p) for p in midi_pitches]
+    
+    prev_costs = {}
+    # Initialize prev_costs with the candidates for the first string_fret pair 
+    for sf in candidates[0]:
+        prev_costs[sf] = sf.fret
+        
+    backpointers = [{}]
+    
+    for i in range(1, len(midi_pitches)):
+        curr_costs: dict[StringFret, float] = {}
+        backpointers.append({})
+        
+        for curr_sf in candidates[i]:
+            best_cost = float('inf')
+            best_prev = None
+            
+            for prev_sf in candidates[i - 1]:
+                curr_cost = prev_costs[prev_sf] + cost(prev_sf, curr_sf)
+                if curr_cost < best_cost:
+                    best_cost = curr_cost 
+                    best_prev = prev_sf
+                    
+            curr_costs[curr_sf] = best_cost
+            backpointers[i][curr_sf] = best_prev
+        
+        prev_costs = curr_costs
+        
+    best_final = min(prev_costs, key=lambda k: prev_costs[k])
+    path = [best_final]
+    for i in range(len(midi_pitches) - 1, 0, -1):
+        path.append(backpointers[i][path[-1]])
+    path.reverse()
+    
+    return path
+
 def closest_string(n: note.Note | pitch.Pitch):
     if isinstance(n, note.Note):
         p = n.pitch
@@ -104,8 +174,6 @@ def closest_string(n: note.Note | pitch.Pitch):
     fret = math.floor(best_semitone + 0.5)
 
     return (best_string, fret)
-
-
 
 def get_score_info(score: stream.Score, xml_root: ET.Element) -> ScoreInfo:
     score_info = ScoreInfo()
@@ -181,14 +249,25 @@ def get_musicxml_tab(xml_path: Path | str):
     
     old_measures: list[stream.Measure] = list(old_part.getElementsByClass('Measure'))
 
-    # The indices of the notes in a chord (besides the first one)
-    chord_indices: list[int] = []
-    note_index = 0
+    # Collect all the pitches to iterate over
+    midi_pitches = []
+    for old_measure in old_measures:
+        for ele in old_measure.notesAndRests:
+            if isinstance(ele, note.Note):
+                midi_pitches.append(ele.pitch.midi)
+            elif isinstance(ele, chord.Chord):
+                # get the midi pitch of the highest note, for now
+                midi_pitches.append(ele.notes[-1].pitch.midi)
+    
+    string_frets = viterbi(midi_pitches=midi_pitches)
+    
+    sf_idx = 0
     for i, old_measure in enumerate(old_measures):
         measure = stream.Measure(number=i+1)
+
         if i+1 == 1:
-            measure.insert(0, score_info.time_signature)
             measure.insert(0, score_info.key_signature)
+            measure.insert(0, score_info.time_signature)
 
         # Insert the tempo marking (bpm) into the measure
         mm = old_measure.getElementsByClass('MetronomeMark').first()
@@ -199,35 +278,54 @@ def get_musicxml_tab(xml_path: Path | str):
 
         for ele in old_measure.recurse().notesAndRests:
             if isinstance(ele, chord.Chord):
-                for n_i, n in enumerate(ele.notes):
-                    string, fret = closest_string(n)
-                    n.articulations.append(articulations.StringIndication(string))
-                    n.articulations.append(articulations.FretIndication(fret))            
+                sf = string_frets[sf_idx]
+                sf_idx += 1
+                
+                n = ele.notes[-1] 
+                
+                n.articulations.append(articulations.StringIndication(sf.string))
+                n.articulations.append(articulations.FretIndication(sf.fret))
+
+                measure.append(n)
+
+                # for n_i, n in enumerate(ele.notes):
+                    # string, fret = closest_string(n)
+                    # n.articulations.append(articulations.StringIndication(string))
+                    # n.articulations.append(articulations.FretIndication(fret))            
                 
                     # Preserve the offset between notes in a chord
                     # For example, if offset = 0 for the first note, offset = 0
                     #  for every other note in the chord.
                     # This helps alphatab render the chord properly 
-                    measure.insert(ele.offset, n)
+                    # measure.insert(ele.offset, n)
 
-                    if n_i > 0:
-                        chord_indices.append(note_index)
+                    # if n_i > 0:
+                    #     chord_indices.append(note_index)
 
-                    note_index += 1
+                    # note_index += 1
 
             elif isinstance(ele, note.Note):
-                string, fret = closest_string(ele)
+                sf = string_frets[sf_idx]
+                sf_idx += 1
                 
-                ele.articulations.append(articulations.StringIndication(string))
-                ele.articulations.append(articulations.FretIndication(fret))
+                ele.articulations.append(articulations.StringIndication(sf.string))
+                ele.articulations.append(articulations.FretIndication(sf.fret))
 
                 measure.append(ele)
+                
+                # string, fret = closest_string(ele)
+                
+                # ele.articulations.append(articulations.StringIndication(string))
+                # ele.articulations.append(articulations.FretIndication(fret))
 
-                note_index += 1
+                # measure.append(ele)
+
+                # note_index += 1
+                
             elif isinstance(ele, note.Rest):
                 measure.append(ele)
 
-                note_index += 1
+                # note_index += 1
     
         part.append(measure)
     
@@ -239,9 +337,9 @@ def get_musicxml_tab(xml_path: Path | str):
 
     # Inject <chord /> into all of the marked "chord" notes manually
     #  so that it renders properly on alphaTab
-    all_notes = root.findall('.//note')
-    for i in chord_indices:
-        n = all_notes[i]
-        n.insert(0, ET.Element('chord'))   
+    # all_notes = root.findall('.//note')
+    # for i in chord_indices:
+    #     n = all_notes[i]
+    #     n.insert(0, ET.Element('chord'))   
 
     return ET.ElementTree(root)
