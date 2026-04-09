@@ -14,11 +14,13 @@ from music21 import (
     instrument,
     chord
 )
-import math
+import math, copy
 from dataclasses import dataclass, field
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+MAX_FRET = 24
+MAX_SPREAD = 5 # max fret spead in one chord
 
 OPEN_STRING_PITCHES = {
     1: pitch.Pitch('E4'), # 'e'
@@ -92,18 +94,117 @@ def closest_string(n: note.Note | pitch.Pitch):
     elif isinstance(n, pitch.Pitch):
         p = n
     
-    best_string = 6
-    best_semitone = 100
+    # best_string = 6
+    # best_semitone = 100
+    candidates = []
     
-    for string, string_pitch in OPEN_STRING_PITCHES.items():
-        i = interval.Interval(string_pitch, p)
-        if i.semitones >= 0 and i.semitones < best_semitone:
-            best_string = string
-            best_semitone = i.semitones
+    for string, open_pitch in OPEN_STRING_PITCHES.items():
+    #     i = interval.Interval(string_pitch, p)
+    #     if i.semitones >= 0 and i.semitones < best_semitone:
+    #         best_string = string
+    #         best_semitone = i.semitones
 
-    fret = math.floor(best_semitone + 0.5)
+    # fret = math.floor(best_semitone + 0.5)
 
-    return (best_string, fret)
+    # return (best_string, fret)
+        semitones = p.midi - open_pitch.midi
+        if 0 <= semitones <= MAX_FRET:
+            candidates.append((string, semitones))
+    if not candidates:
+        raise ValueError(f"Pitch {p} is out of guitar range")
+    # this prefers the lowest fret, if its tied, prefer lowest string number
+    string_num, fret = min(candidates, key=lambda x: (x[1], x[0]))
+    return string_num, int(fret)
+
+def assign_chord_strings(chord_notes: list[note.Note]):
+    """ assign one note per string if we encounter a chord
+        Returns: [(cloned_note, string, fret)]
+    """
+    # sort low pitch to high pitch
+    sorted_notes = sorted(chord_notes, key=lambda n: n.pitch.midi)
+
+    # build candidate strings for each note
+    note_candidates = []
+    for n in sorted_notes:
+        candidates = []
+        for string_num, open_pitch in OPEN_STRING_PITCHES.items():
+            fret = n.pitch.midi - open_pitch.midi
+            if 0 <= fret <= MAX_FRET:
+                candidates.append((string_num, int(fret)))
+        if not candidates:
+            raise ValueError(f"Chord note {n.pitch} is out of guitar range")
+        note_candidates.append((n, candidates))
+
+    best_assignment = None
+    best_score = None
+
+    # pick a note, try putting it on a string, move to next note, if its impossible, go back and try another string
+    def backtrack(idx, used_strings, current):
+        nonlocal best_assignment, best_score
+
+        if idx == len(note_candidates):
+            frets = [fret for _, _, fret in current if fret > 0]
+            span = (max(frets) - min(frets)) if frets else 0
+
+            if span > MAX_SPREAD:
+                return
+
+            # scoring:
+            # 1. minimize fret span
+            # 2. minimize average fret
+            # 3. prefer more open strings
+            avg_fret = sum(f for _, _, f in current) / len(current)
+            open_count = sum(1 for _, _, f in current if f == 0)
+            score = (span, avg_fret, -open_count)
+
+            if best_score is None or score < best_score:
+                best_score = score
+                best_assignment = current[:]
+            return
+
+        orig_note, candidates = note_candidates[idx]
+
+        # Prefer keeping lower notes on lower-pitched strings
+        # larger string numbers first for lower notes
+        candidates = sorted(candidates, key=lambda x: (-x[0], x[1]))
+
+        for string_num, fret in candidates:
+            if string_num in used_strings:
+                continue
+
+            current.append((orig_note, string_num, fret))
+            used_strings.add(string_num)
+
+            backtrack(idx + 1, used_strings, current)
+
+            used_strings.remove(string_num)
+            current.pop()
+
+    backtrack(0, set(), [])
+
+    if best_assignment is None:
+        # fallback. assign by closest available string
+        used_strings = set()
+        fallback = []
+        for orig_note, candidates in note_candidates:
+            chosen = None
+            for string_num, fret in sorted(candidates, key=lambda x: (x[1], -x[0])):
+                if string_num not in used_strings:
+                    chosen = (orig_note, string_num, fret)
+                    break
+            if chosen is None:
+                raise ValueError(f"Could not assign playable string for chord note {orig_note.pitch}")
+            used_strings.add(chosen[1])
+            fallback.append(chosen)
+        best_assignment = fallback
+
+    # clone here once
+    result = []
+    for orig_note, string_num, fret in best_assignment:
+        new_note = copy.deepcopy(orig_note)
+        result.append((new_note, string_num, fret))
+
+    return result
 
 
 
@@ -199,11 +300,14 @@ def get_musicxml_tab(xml_path: Path | str):
 
         for ele in old_measure.recurse().notesAndRests:
             if isinstance(ele, chord.Chord):
-                for n_i, n in enumerate(ele.notes):
-                    string, fret = closest_string(n)
+                assignments = assign_chord_strings(ele.notes)
+
+                for n_i, (n, string, fret) in enumerate(assignments):
+
                     n.articulations.append(articulations.StringIndication(string))
                     n.articulations.append(articulations.FretIndication(fret))            
-                
+
+                    
                     # Preserve the offset between notes in a chord
                     # For example, if offset = 0 for the first note, offset = 0
                     #  for every other note in the chord.
@@ -216,16 +320,18 @@ def get_musicxml_tab(xml_path: Path | str):
                     note_index += 1
 
             elif isinstance(ele, note.Note):
-                string, fret = closest_string(ele)
+                n = copy.deepcopy(ele)
+                string, fret = closest_string(n)
                 
-                ele.articulations.append(articulations.StringIndication(string))
-                ele.articulations.append(articulations.FretIndication(fret))
+                n.articulations.append(articulations.StringIndication(string))
+                n.articulations.append(articulations.FretIndication(fret))
 
-                measure.append(ele)
+                measure.append(n)
 
                 note_index += 1
             elif isinstance(ele, note.Rest):
-                measure.append(ele)
+                n = copy.deepcopy(ele)
+                measure.append(n)
 
                 note_index += 1
     
