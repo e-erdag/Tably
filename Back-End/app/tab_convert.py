@@ -376,32 +376,32 @@ def get_musicxml_tab(xml_path: Path | str):
 
         for ele in old_measure.recurse().notesAndRests:
             if isinstance(ele, chord.Chord):
-                # assignments = assign_chord_strings(ele.notes)
+                assignments = assign_chord_strings(ele.notes)
 
-                # for n_i, (n, string, fret) in enumerate(assignments):
+                for n_i, (n, string, fret) in enumerate(assignments):
 
-                #     n.articulations.append(articulations.StringIndication(string))
-                #     n.articulations.append(articulations.FretIndication(fret))            
+                    n.articulations.append(articulations.StringIndication(string))
+                    n.articulations.append(articulations.FretIndication(fret))            
  
-                #     # Preserve the offset between notes in a chord
-                #     # For example, if offset = 0 for the first note, offset = 0
-                #     #  for every other note in the chord.
-                #     # This helps alphatab render the chord properly 
-                #     measure.insert(ele.offset, n)
+                    # Preserve the offset between notes in a chord
+                    # For example, if offset = 0 for the first note, offset = 0
+                    #  for every other note in the chord.
+                    # This helps alphatab render the chord properly 
+                    measure.insert(ele.offset, n)
 
-                #     if n_i > 0:
-                #         chord_indices.append(note_idx)
+                    if n_i > 0:
+                        chord_indices.append(note_idx)
 
-                #     note_idx += 1
+                    note_idx += 1
                 
-                sf = string_frets[sf_idx]
+                # sf = string_frets[sf_idx]
                 
-                n = ele.notes[-1]
+                # n = ele.notes[-1]
                 
-                n.articulations.append(articulations.StringIndication(sf.string))
-                n.articulations.append(articulations.FretIndication(sf.fret))
+                # n.articulations.append(articulations.StringIndication(sf.string))
+                # n.articulations.append(articulations.FretIndication(sf.fret))
                 
-                measure.append(n)
+                # measure.append(n)
                 
                 sf_idx += 1
 
