@@ -63,6 +63,16 @@ function GuitarTabPage() {
 
   return (
     <>
+      
+
+      <AlphaTabViewer
+        file={convertedFiles[currentIndex]}
+        files={files}
+        convertingIndices={convertingIndices}
+        currentIndex={currentIndex}
+        setCurrentIndex={setCurrentIndex}
+      />
+
       <div className="tab-page">
         <button onClick={() => navigate('/')}>Return</button>
 
@@ -89,14 +99,6 @@ function GuitarTabPage() {
           </a>
         )}
       </div>
-
-      <AlphaTabViewer
-        file={convertedFiles[currentIndex]}
-        files={files}
-        convertingIndices={convertingIndices}
-        currentIndex={currentIndex}
-        setCurrentIndex={setCurrentIndex}
-      />
     </>
   );
 }

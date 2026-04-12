@@ -10,6 +10,7 @@ interface AlphaTabControlsProps {
 	trackPrograms: Record<number, number>;
 	setTrackPrograms: Dispatch<SetStateAction<Record<number, number>>>;
 	reloadFile: () => void;
+	onFullscreen: () => void;
 }
 
 export default function AlphaTabControls({
@@ -17,12 +18,14 @@ export default function AlphaTabControls({
 	tracks,
 	trackPrograms,
 	setTrackPrograms,
-	reloadFile
+	reloadFile,
+	onFullscreen
 }: AlphaTabControlsProps) {
 	const [isPlaying, setIsPlaying] = useState(false);
 	const [speed, setSpeed] = useState(1);
 	const [metronomeOn, setMetronomeOn] = useState(false);
 	const [activeTrack, setActiveTrack] = useState(0);
+
 
 
 	// Start/Stop api calls
@@ -96,6 +99,7 @@ export default function AlphaTabControls({
 		changeSpeed(nextSpeed);
 	};
 
+	
 	return (
 		<div className="controls-bar">
 			{/* LEFT: Track selectors */}
@@ -170,6 +174,9 @@ export default function AlphaTabControls({
 
 			{/* RIGHT: empty spacer (balances layout) */}
 			<div className="spacer" />
+			<div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '150px', justifyContent: 'flex-end' }}>
+				<button onClick={onFullscreen}>⛶ Fullscreen</button>
+			</div>
 		</div>
 	);
 }

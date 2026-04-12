@@ -21,6 +21,7 @@ export default function AlphaTabViewer({ file, files, currentIndex, setCurrentIn
 	const [api, setApi] = useState<AlphaTabApi>();
 	const [tracks, setTracks] = useState<any[]>([]);
 	const [trackPrograms, setTrackPrograms] = useState<Record<number, number>>({});
+	const [isFullscreen, setIsFullscreen] = useState(false);
 
 	useEffect(() => {
 		const api = new AlphaTabApi(mainRef.current!, {
@@ -44,46 +45,78 @@ export default function AlphaTabViewer({ file, files, currentIndex, setCurrentIn
 
 		setApi(api);
 
+		const unsubScore = api.scoreLoaded.on((score) => {
+			setTracks(score.tracks);
+			setIsLoading(false);
+
+			score.tracks.forEach((track, index) => {
+				track.playbackInfo.program =
+					trackPrograms[index] ?? track.playbackInfo.program;
+			});
+		});
+
 		let cancelled = false;
 		const loadFile = async () => {
 			setIsLoading(true);
+
+			api.pause();
+
 			const buffer = await file.arrayBuffer();
-			if(!cancelled)
-				api.load(buffer);
+			if (!cancelled) {
+				setTimeout(() => {
+					api.load(buffer);
+				}, 0);
+			}
 		};
 		loadFile();
 
-		api.renderStarted.on(() => {
+
+		const unsubRenderStart = api.renderStarted.on(() => {
 			setIsLoading(true);
 		});
 
-		api.renderFinished.on(() => {
+		const unsubRenderFinish = api.renderFinished.on(() => {
 			setIsLoading(false);
 		});
 
-		// for getting different tracks like guitar or piano
-		api.scoreLoaded.on((score) => {
-			setTracks(score.tracks);
-		});
+		const unsubNoteUp = api.noteMouseUp.on(() => {});
 
-
-		//for handling user moving cursor via clicks
-		const unsubNoteUp = api.noteMouseUp.on((note) => {
-			if (note)  api.playBeat(note.beat);
-		});
-
-		const unsubBeatUp = api.beatMouseUp.on((beat) => {
-			if (beat) api.playBeat(beat);
-		});
+		const unsubBeatUp = api.beatMouseUp.on(() => {});
+		
 
 		return () => {
 			cancelled = true;
+			unsubRenderStart();
+			unsubRenderFinish();
 			unsubNoteUp();
 			unsubBeatUp();
+			unsubScore();
 			api.destroy();
 		}
 	}, [file]);
 
+	const handleFullscreen = () => {
+	if (mainRef.current) {
+		mainRef.current.requestFullscreen().then(() => {
+		setTimeout(() => {
+			api?.render(); // forces AlphaTab to re-render at new width
+		}, 100);
+		});
+	}
+	};
+
+	useEffect(() => {
+		const handleFullscreenChange = async () => {
+			if (!document.fullscreenElement && api) {
+			api.pause();
+			const buffer = await file.arrayBuffer();
+			setTimeout(() => { api.load(buffer); }, 0);
+			}
+		};
+
+		document.addEventListener('fullscreenchange', handleFullscreenChange);
+		return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+	}, [api, file]);
 
 
 	return (
@@ -157,21 +190,18 @@ export default function AlphaTabViewer({ file, files, currentIndex, setCurrentIn
 					tracks={api?.tracks ?? []}
 					trackPrograms={trackPrograms}
 					setTrackPrograms={setTrackPrograms}
-					reloadFile={async () => {  //
+					reloadFile={async () => {
 						if (!api) return;
-						api.stop();
-						const buffer = await file.arrayBuffer();  // now valid
 
-						// Assign selected program per track before loading
-						api.tracks.forEach((track, index) => {
-							track.playbackInfo.program = trackPrograms[index] ?? track.playbackInfo.program;
-						});
-            api.scoreLoaded.on(() => {
-              api.play();
-            });
-						api.load(buffer);
-						
+						api.pause();
+
+						const buffer = await file.arrayBuffer();
+
+						setTimeout(() => {
+							api.load(buffer);
+						}, 0);
 					}}
+					onFullscreen={handleFullscreen}
 				/>
 			</div>
 		</div>
