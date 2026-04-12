@@ -10,8 +10,9 @@ function DescriptionBox({
 }) {
   return (
     <div className="description-box">
-      <h2>Welcome to Tably</h2>
-      <p>A wesbite for converting sheet music to guitar tabs</p>
+      <h1><span className="shift-slow">Hi! Welcome to</span></h1>
+      <h2><span className="shift-fast">Tably𝄞</span></h2>
+      <p>A website for converting sheet music to guitar tabs</p>
     </div>
   );
 }

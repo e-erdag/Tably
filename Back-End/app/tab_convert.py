@@ -103,7 +103,31 @@ def get_frets(midi_pitch: int) -> list[StringFret]:
         fret = midi_pitch - open_pitch.midi
         if 0 <= fret <= MAX_FRET:
             string_frets.append(StringFret(string, fret))
-    return string_frets
+
+    if string_frets:
+        return string_frets
+
+    # HOMR can emit pitches slightly outside standard guitar range.
+    # Fall back to the closest clamped string/fret position so we still
+    # produce playable-looking tablature instead of failing the upload.
+    best_string = 6
+    best_fret = 0
+    best_error: tuple[int, int, int] | None = None
+    for string, open_pitch in E_STANDARD_MIDI.items():
+        raw_fret = midi_pitch - open_pitch
+        clamped_fret = max(0, min(MAX_FRET, raw_fret))
+        error = abs(raw_fret - clamped_fret)
+        score = (error, clamped_fret, string)
+        if best_error is None or score < best_error:
+            best_error = score
+            best_string = string
+            best_fret = clamped_fret
+
+    return [StringFret(best_string, best_fret)]
+
+def get_closest_string_fret(midi_pitch: int) -> tuple[int, int]:
+    fallback = get_frets(midi_pitch)[0]
+    return fallback.string, fallback.fret
 
 def cost(prev: StringFret, curr: StringFret) -> float:
     if prev.fret > 0 and curr.fret > 0:
@@ -153,7 +177,7 @@ def viterbi(midi_pitches: list[int]) -> list[StringFret]:
             best_cost = float('inf')
             best_prev = None
             
-            for prev_sf in candidates[i - 1]:
+            for prev_sf in prev_costs:
                 curr_cost = prev_costs[prev_sf] + cost(prev_sf, curr_sf)
                 if curr_cost < best_cost:
                     best_cost = curr_cost 
@@ -172,10 +196,36 @@ def viterbi(midi_pitches: list[int]) -> list[StringFret]:
     
     return path
 
+<<<<<<< HEAD
+=======
+def closest_string(n: note.Note | pitch.Pitch):
+    if isinstance(n, note.Note):
+        p = n.pitch
+    elif isinstance(n, pitch.Pitch):
+        p = n
+
+    candidates = []
+    
+    for string, open_pitch in OPEN_STRING_PITCHES.items():
+
+    # return (best_string, fret)
+        semitones = p.midi - open_pitch.midi
+        if 0 <= semitones <= MAX_FRET:
+            candidates.append((string, semitones))
+    if not candidates:
+        raise ValueError(f"Pitch {p} is out of guitar range")
+    # this prefers the lowest fret, if its tied, prefer lowest string number
+    string_num, fret = min(candidates, key=lambda x: (x[1], x[0]))
+    return string_num, int(fret)
+
+>>>>>>> 6b5aada9f94441da08a772976ad88e0cb663ea97
 def assign_chord_strings(chord_notes: list[note.Note]):
     """ assign one note per string if we encounter a chord
         Returns: [(cloned_note, string, fret)]
     """
+    if len(chord_notes) > len(OPEN_STRING_PITCHES):
+        chord_notes = chord_notes[-len(OPEN_STRING_PITCHES):]
+
     # sort low pitch to high pitch
     sorted_notes = sorted(chord_notes, key=lambda n: n.pitch.midi)
 
@@ -190,7 +240,7 @@ def assign_chord_strings(chord_notes: list[note.Note]):
             if 0 <= fret <= MAX_FRET:
                 candidates.append((string_num, int(fret)))
         if not candidates:
-            raise ValueError(f"Chord note {n.pitch} is out of guitar range")
+            candidates.append(get_closest_string_fret(n.pitch.midi))
         note_candidates.append((n, candidates))
 
     best_assignment = None
@@ -251,10 +301,15 @@ def assign_chord_strings(chord_notes: list[note.Note]):
                     chosen = (orig_note, string_num, fret)
                     break
             if chosen is None:
-                raise ValueError(f"Could not assign playable string for chord note {orig_note.pitch}")
+                continue
             used_strings.add(chosen[1])
             fallback.append(chosen)
         best_assignment = fallback
+
+    if not best_assignment:
+        highest_note = max(sorted_notes, key=lambda n: n.pitch.midi)
+        string_num, fret = get_closest_string_fret(highest_note.pitch.midi)
+        best_assignment = [(highest_note, string_num, fret)]
 
     # clone here once
     result = []
@@ -301,6 +356,49 @@ def get_score_info(score: stream.Score, xml_root: ET.Element) -> ScoreInfo:
     
     return score_info
 
+# detect if the music provided is for piano (2 staffs)
+def is_grand_staff_score(xml_root: ET.Element) -> bool:
+    for attributes in xml_root.findall('.//attributes'):
+        staves = attributes.findtext('staves')
+        if staves and staves.isdigit() and int(staves) > 1:
+            return True
+
+        clef_signs = {
+            clef_element.findtext('sign')
+            for clef_element in attributes.findall('clef')
+            if clef_element.findtext('sign')
+        }
+        if 'G' in clef_signs and 'F' in clef_signs:
+            return True
+
+    staff_numbers = {
+        staff.text
+        for staff in xml_root.findall('.//note/staff')
+        if staff.text
+    }
+    return '1' in staff_numbers and '2' in staff_numbers
+
+
+def element_staff_number(ele: note.GeneralNote | chord.Chord) -> int | None:
+    if getattr(ele, 'staffNumber', None) is not None:
+        return ele.staffNumber
+
+    for note_in_chord in getattr(ele, 'notes', []):
+        if getattr(note_in_chord, 'staffNumber', None) is not None:
+            return note_in_chord.staffNumber
+
+    return None
+
+# if given more than 1 staff, use only the upper staff because 
+# the upper staff is "usually" the melody
+def should_keep_element(ele: note.GeneralNote | chord.Chord, use_upper_staff_only: bool) -> bool:
+    if not use_upper_staff_only:
+        return True
+
+    staff_number = element_staff_number(ele)
+    return staff_number in (None, 1)
+
+
 def parse_score(xml_path: Path | str):
     score_info = ScoreInfo()
     
@@ -320,13 +418,14 @@ def parse_score(xml_path: Path | str):
     
     score_info = get_score_info(score, xml_root)
     
-    return score, score_info
+    return score, score_info, xml_root
 
 # Breaks down with more complex songs. Will probably need to update
 # to create a fresh score instead of updating the old one
 def get_musicxml_tab(xml_path: Path | str):
-    score, score_info = parse_score(xml_path)
+    score, score_info, xml_root = parse_score(xml_path)
     old_part = score.parts[0]
+    use_upper_staff_only = is_grand_staff_score(xml_root)
     
     tab = stream.Score()
     tab.insert(0, metadata.Metadata())
@@ -341,7 +440,9 @@ def get_musicxml_tab(xml_path: Path | str):
     # Collect all the pitches to iterate over
     midi_pitches: list[int] = []
     for old_measure in old_measures:
-        for ele in old_measure.recurse().notesAndRests:
+        for ele in old_measure.notesAndRests:
+            if not should_keep_element(ele, use_upper_staff_only): #for piano scores
+                continue
             if isinstance(ele, note.Note):
                 midi_pitches.append(ele.pitch.midi)
             elif isinstance(ele, chord.Chord):
@@ -358,7 +459,7 @@ def get_musicxml_tab(xml_path: Path | str):
     string_frets = viterbi(midi_pitches=midi_pitches)
 
     chord_indices = []
-    note_idx = 0
+    pitched_note_idx = 0
     sf_idx = 0
     for i, old_measure in enumerate(old_measures):
         measure = stream.Measure(number=i+1)
@@ -375,6 +476,8 @@ def get_musicxml_tab(xml_path: Path | str):
             measure.insert(0, new_mm)
 
         for ele in old_measure.recurse().notesAndRests:
+            if not should_keep_element(ele, use_upper_staff_only): #for piano scores
+                continue
             if isinstance(ele, chord.Chord):
                 assignments = assign_chord_strings(ele.notes)
 
@@ -390,10 +493,9 @@ def get_musicxml_tab(xml_path: Path | str):
                     measure.insert(ele.offset, n)
 
                     if n_i > 0:
-                        chord_indices.append(note_idx)
-
-                    note_idx += 1
+                        chord_indices.append(pitched_note_idx)
                 
+                    pitched_note_idx += 1
                 # sf = string_frets[sf_idx]
                 
                 # n = ele.notes[-1]
@@ -406,21 +508,22 @@ def get_musicxml_tab(xml_path: Path | str):
                 sf_idx += 1
 
             elif isinstance(ele, note.Note):
-                sf = string_frets[sf_idx]
-                sf_idx += 1
+                if sf_idx < len(string_frets):
+                    sf = string_frets[sf_idx]
+                    sf_idx += 1
+                else:
+                    string_num, fret = get_closest_string_fret(ele.pitch.midi)
+                    sf = StringFret(string_num, fret)
                 
                 ele.articulations.append(articulations.StringIndication(sf.string))
                 ele.articulations.append(articulations.FretIndication(sf.fret))
 
                 measure.append(ele)
-
-                note_idx += 1
+                pitched_note_idx += 1
                 
             elif isinstance(ele, note.Rest):
                 n = copy.deepcopy(ele)
                 measure.append(n)
-
-                note_idx += 1
     
         part.append(measure)
     
@@ -434,6 +537,8 @@ def get_musicxml_tab(xml_path: Path | str):
     #  so that it renders properly on alphaTab
     all_notes = root.findall('.//note')
     for i in chord_indices:
+        if i >= len(all_notes):
+            continue
         n = all_notes[i]
         n.insert(0, ET.Element('chord'))   
 

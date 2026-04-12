@@ -94,3 +94,21 @@
 .at-cursor-bar {
   background: rgba(0, 0, 0, 0.15) !important;
 }
+
+/*for fullscreen mode*/
+.at-main:fullscreen {
+  background: #fff;
+  padding: 2rem 4rem;
+  overflow-y: auto;
+  box-shadow: inset 0 0 0 12px #111;
+  width: 100vw;
+  max-width: 100vw;
+  box-sizing: border-box;
+}
+
+.at-main:fullscreen,
+.at-main:fullscreen > * {
+  width: 100vw !important;
+  max-width: 100vw !important;
+  box-sizing: border-box;
+}

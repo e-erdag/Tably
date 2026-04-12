@@ -19,6 +19,7 @@
 }
 
 .tab-page h2 {
+  font-family: var(--font-body);
   font-size: 2rem;
   margin-bottom: 1rem;
   color: #FFFFFF;
