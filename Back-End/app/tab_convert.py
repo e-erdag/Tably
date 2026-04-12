@@ -19,9 +19,6 @@ from dataclasses import dataclass, field
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-MAX_FRET = 24
-MAX_SPREAD = 5 # max fret spead in one chord
-
 OPEN_STRING_PITCHES = {
     1: pitch.Pitch('E4'), # 'e'
     2: pitch.Pitch('B3'), # 'B'
@@ -31,15 +28,12 @@ OPEN_STRING_PITCHES = {
     6: pitch.Pitch('E2'), # 'E'
 }
 
-E_STANDARD_MIDI = {
-    1: 64, # E4
-    2: 59, # B3
-    3: 55, # G3
-    4: 50, # D3
-    5: 45, # A2
-    6: 40  # E2 
-}
 MAX_FRET = 24
+MAX_SPREAD = 5 # max fret spead in one chord
+MAX_MIDI_PITCH = OPEN_STRING_PITCHES[1].midi + MAX_FRET
+MIN_MIDI_PITCH = OPEN_STRING_PITCHES[6].midi
+
+PITCH_SHIFT = 0
 
 E_STANDARD_GUITAR = [
     (1, 'E', '2'),
@@ -105,25 +99,45 @@ def add_staff_details(score: stream.Score) -> ET.ElementTree:
 
 def get_frets(midi_pitch: int) -> list[StringFret]:
     string_frets = []
-    for string, open_pitch in E_STANDARD_MIDI.items():
-        fret = midi_pitch - open_pitch
+    for string, open_pitch in OPEN_STRING_PITCHES.items():
+        fret = midi_pitch - open_pitch.midi
         if 0 <= fret <= MAX_FRET:
             string_frets.append(StringFret(string, fret))
     return string_frets
 
 def cost(prev: StringFret, curr: StringFret) -> float:
-    fret_dist = abs(prev.fret - curr.fret)
-    string_dist = abs(prev.string - curr.string)
+    if prev.fret > 0 and curr.fret > 0:
+        fret_dist = abs(prev.fret - curr.fret)
+    else:
+        fret_dist = 0
+    # string_dist = abs(prev.string - curr.string)
+
+    fret_cost = fret_dist * 2 
+        
+    open = -8 if curr.fret == 0 else 0
     
-    open = -2 if curr.fret == 0 else 0
+    pos_cost_base = 1.2   
+    pos_cost = pos_cost_base ** curr.fret
     
-    return fret_dist * 2 + string_dist + open
+    return fret_cost + pos_cost + open
 
 def viterbi(midi_pitches: list[int]) -> list[StringFret]:
     if not midi_pitches: return []
     
-    candidates = [get_frets(p) for p in midi_pitches]
+    candidates = [get_frets(p + PITCH_SHIFT) for p in midi_pitches]
     
+    # Hotfix for if the pitches of a song fall outside the range of the guitar
+    for i, c in enumerate(candidates):
+        if not c:
+            p = midi_pitches[i]
+            while p < MIN_MIDI_PITCH:
+                p += 12 
+            while p > MAX_MIDI_PITCH:
+                p -= 12 
+            midi_pitches[i] = p
+            
+            candidates[i] = get_frets(p)
+            
     prev_costs = {}
     # Initialize prev_costs with the candidates for the first string_fret pair 
     for sf in candidates[0]:
@@ -158,34 +172,6 @@ def viterbi(midi_pitches: list[int]) -> list[StringFret]:
     
     return path
 
-def closest_string(n: note.Note | pitch.Pitch):
-    if isinstance(n, note.Note):
-        p = n.pitch
-    elif isinstance(n, pitch.Pitch):
-        p = n
-    
-    # best_string = 6
-    # best_semitone = 100
-    candidates = []
-    
-    for string, open_pitch in OPEN_STRING_PITCHES.items():
-    #     i = interval.Interval(string_pitch, p)
-    #     if i.semitones >= 0 and i.semitones < best_semitone:
-    #         best_string = string
-    #         best_semitone = i.semitones
-
-    # fret = math.floor(best_semitone + 0.5)
-
-    # return (best_string, fret)
-        semitones = p.midi - open_pitch.midi
-        if 0 <= semitones <= MAX_FRET:
-            candidates.append((string, semitones))
-    if not candidates:
-        raise ValueError(f"Pitch {p} is out of guitar range")
-    # this prefers the lowest fret, if its tied, prefer lowest string number
-    string_num, fret = min(candidates, key=lambda x: (x[1], x[0]))
-    return string_num, int(fret)
-
 def assign_chord_strings(chord_notes: list[note.Note]):
     """ assign one note per string if we encounter a chord
         Returns: [(cloned_note, string, fret)]
@@ -198,7 +184,9 @@ def assign_chord_strings(chord_notes: list[note.Note]):
     for n in sorted_notes:
         candidates = []
         for string_num, open_pitch in OPEN_STRING_PITCHES.items():
-            fret = n.pitch.midi - open_pitch.midi
+            fret = n.pitch.midi - open_pitch.midi + PITCH_SHIFT
+            if fret > MAX_FRET:
+                fret -= 12
             if 0 <= fret <= MAX_FRET:
                 candidates.append((string_num, int(fret)))
         if not candidates:
@@ -351,17 +339,24 @@ def get_musicxml_tab(xml_path: Path | str):
     old_measures: list[stream.Measure] = list(old_part.getElementsByClass('Measure'))
 
     # Collect all the pitches to iterate over
-    midi_pitches = []
+    midi_pitches: list[int] = []
     for old_measure in old_measures:
-        for ele in old_measure.notesAndRests:
+        for ele in old_measure.recurse().notesAndRests:
             if isinstance(ele, note.Note):
                 midi_pitches.append(ele.pitch.midi)
             elif isinstance(ele, chord.Chord):
                 # get the midi pitch of the highest note, for now
                 midi_pitches.append(ele.notes[-1].pitch.midi)
     
-    string_frets = viterbi(midi_pitches=midi_pitches)
+    # print(min(midi_pitches), max(midi_pitches))
     
+    if max(midi_pitches) > MAX_MIDI_PITCH:
+        midi_pitches = [p-12 for p in midi_pitches]
+    elif min(midi_pitches) < MIN_MIDI_PITCH:
+        midi_pitches = [p+12 for p in midi_pitches]
+    
+    string_frets = viterbi(midi_pitches=midi_pitches)
+
     chord_indices = []
     note_idx = 0
     sf_idx = 0
@@ -381,24 +376,34 @@ def get_musicxml_tab(xml_path: Path | str):
 
         for ele in old_measure.recurse().notesAndRests:
             if isinstance(ele, chord.Chord):
-                assignments = assign_chord_strings(ele.notes)
+                # assignments = assign_chord_strings(ele.notes)
 
-                for n_i, (n, string, fret) in enumerate(assignments):
+                # for n_i, (n, string, fret) in enumerate(assignments):
 
-                    n.articulations.append(articulations.StringIndication(string))
-                    n.articulations.append(articulations.FretIndication(fret))            
+                #     n.articulations.append(articulations.StringIndication(string))
+                #     n.articulations.append(articulations.FretIndication(fret))            
+ 
+                #     # Preserve the offset between notes in a chord
+                #     # For example, if offset = 0 for the first note, offset = 0
+                #     #  for every other note in the chord.
+                #     # This helps alphatab render the chord properly 
+                #     measure.insert(ele.offset, n)
 
-                    
-                    # Preserve the offset between notes in a chord
-                    # For example, if offset = 0 for the first note, offset = 0
-                    #  for every other note in the chord.
-                    # This helps alphatab render the chord properly 
-                    measure.insert(ele.offset, n)
+                #     if n_i > 0:
+                #         chord_indices.append(note_idx)
 
-                    if n_i > 0:
-                        chord_indices.append(note_idx)
-
-                    note_idx += 1
+                #     note_idx += 1
+                
+                sf = string_frets[sf_idx]
+                
+                n = ele.notes[-1]
+                
+                n.articulations.append(articulations.StringIndication(sf.string))
+                n.articulations.append(articulations.FretIndication(sf.fret))
+                
+                measure.append(n)
+                
+                sf_idx += 1
 
             elif isinstance(ele, note.Note):
                 sf = string_frets[sf_idx]
@@ -408,13 +413,6 @@ def get_musicxml_tab(xml_path: Path | str):
                 ele.articulations.append(articulations.FretIndication(sf.fret))
 
                 measure.append(ele)
-                
-                # string, fret = closest_string(ele)
-                
-                # ele.articulations.append(articulations.StringIndication(string))
-                # ele.articulations.append(articulations.FretIndication(fret))
-
-                # measure.append(ele)
 
                 note_idx += 1
                 
