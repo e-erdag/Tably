@@ -3,7 +3,7 @@ name = "back-end"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.12.3,<3.13"
+requires-python = ">=3.11.3,<3.13"
 dependencies = [
     "defusedxml>=0.7.1",
     "fastapi>=0.133.1",
