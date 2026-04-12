@@ -109,7 +109,27 @@ def get_frets(midi_pitch: int) -> list[StringFret]:
         fret = midi_pitch - open_pitch
         if 0 <= fret <= MAX_FRET:
             string_frets.append(StringFret(string, fret))
-    return string_frets
+
+    if string_frets:
+        return string_frets
+
+    # HOMR can emit pitches slightly outside standard guitar range.
+    # Fall back to the closest clamped string/fret position so we still
+    # produce playable-looking tablature instead of failing the upload.
+    best_string = 6
+    best_fret = 0
+    best_error: tuple[int, int, int] | None = None
+    for string, open_pitch in E_STANDARD_MIDI.items():
+        raw_fret = midi_pitch - open_pitch
+        clamped_fret = max(0, min(MAX_FRET, raw_fret))
+        error = abs(raw_fret - clamped_fret)
+        score = (error, clamped_fret, string)
+        if best_error is None or score < best_error:
+            best_error = score
+            best_string = string
+            best_fret = clamped_fret
+
+    return [StringFret(best_string, best_fret)]
 
 def cost(prev: StringFret, curr: StringFret) -> float:
     fret_dist = abs(prev.fret - curr.fret)
@@ -139,7 +159,7 @@ def viterbi(midi_pitches: list[int]) -> list[StringFret]:
             best_cost = float('inf')
             best_prev = None
             
-            for prev_sf in candidates[i - 1]:
+            for prev_sf in prev_costs:
                 curr_cost = prev_costs[prev_sf] + cost(prev_sf, curr_sf)
                 if curr_cost < best_cost:
                     best_cost = curr_cost 
@@ -163,18 +183,10 @@ def closest_string(n: note.Note | pitch.Pitch):
         p = n.pitch
     elif isinstance(n, pitch.Pitch):
         p = n
-    
-    # best_string = 6
-    # best_semitone = 100
+
     candidates = []
     
     for string, open_pitch in OPEN_STRING_PITCHES.items():
-    #     i = interval.Interval(string_pitch, p)
-    #     if i.semitones >= 0 and i.semitones < best_semitone:
-    #         best_string = string
-    #         best_semitone = i.semitones
-
-    # fret = math.floor(best_semitone + 0.5)
 
     # return (best_string, fret)
         semitones = p.midi - open_pitch.midi
