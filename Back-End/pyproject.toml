@@ -13,6 +13,7 @@ dependencies = [
     "python-multipart>=0.0.22",
     "uvicorn>=0.41.0",
 ]
-
+[tool.pyright]
+reportPrivateImportUsage = false
 [tool.poetry]
 package-mode = false

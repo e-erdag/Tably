@@ -2,5 +2,8 @@
     "python.analysis.extraPaths": [
         "./homr-service/homr"
     ],
-    "python-envs.defaultEnvManager": "ms-python.python:system"
+    "python-envs.defaultEnvManager": "ms-python.python:system",
+    "python.analysis.diagnosticSeverityOverrides": {
+        "reportPrivateImportUsage": "none"
+    }
 }
