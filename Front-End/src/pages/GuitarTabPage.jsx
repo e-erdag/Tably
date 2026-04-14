@@ -49,8 +49,10 @@ function GuitarTabPage() {
       const disposition = response.headers.get("Content-Disposition");
       const match = disposition?.match(/filename="(.+)"/);
       const downloadName = match?.[1] || "converted.musicxml";
+      const displayName = newFile.name.replace(/\.[^/.]+$/, '').replace(/ /g, '_') + '.musicxml';
 
-      const convertedFile = new File([blob], downloadName);
+
+      const convertedFile = new File([blob], displayName);
 
       setConvertedFiles(prev => [...prev, convertedFile]);
       setConvertingIndices(prev => prev.filter(i => i !== newIndex));

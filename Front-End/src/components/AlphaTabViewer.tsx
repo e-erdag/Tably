@@ -15,15 +15,16 @@ interface AlphaTabViewerProps {
 
 export default function AlphaTabViewer({ file, files, currentIndex, setCurrentIndex, convertingIndices }: AlphaTabViewerProps) {
 
-  const mainRef = useRef<HTMLDivElement>(null);
-	const viewportRef = useRef<HTMLDivElement>(null);
-	const [isLoading, setIsLoading] = useState(true);
-	const [api, setApi] = useState<AlphaTabApi>();
-	const [tracks, setTracks] = useState<any[]>([]);
-	const [trackPrograms, setTrackPrograms] = useState<Record<number, number>>({});
-	const [isFullscreen, setIsFullscreen] = useState(false);
+  	const mainRef = useRef<HTMLDivElement>(null); //where alphatabs will render tabs
+	const viewportRef = useRef<HTMLDivElement>(null); //making tabs scrollable
+	const [isLoading, setIsLoading] = useState(true); //load state
+	const [api, setApi] = useState<AlphaTabApi>(); //the alphatab api instance
+	const [tracks, setTracks] = useState<any[]>([]); //stores tracks (music to play) TODO
+	const [trackPrograms, setTrackPrograms] = useState<Record<number, number>>({}); //selected instrument to play
+	const [isFullscreen, setIsFullscreen] = useState(false); //stores wether fullscreen mode active or not
 
 	useEffect(() => {
+		// create instance of AlphaTabs api
 		const api = new AlphaTabApi(mainRef.current!, {
 			notation: {
 				rhythmMode: TabRhythmMode.Hidden // Used to hide stem lines
@@ -34,21 +35,26 @@ export default function AlphaTabViewer({ file, files, currentIndex, setCurrentIn
 				fontDirectory: '/font/'
 			},
 			player: {
-				enablePlayer: true,
-				enableCursor: true,
-				enableUserInteraction: true,
-				scrollElement: viewportRef.current!,
-				soundFont: '/soundfont/sonivox.sf2', 
+				enablePlayer: true, //enables playback
+				enableCursor: true, //moving cursor
+				enableUserInteraction: true, //clicking interaction
+				scrollElement: viewportRef.current!, //autoscroll
+				soundFont: '/soundfont/sonivox.sf2', //sound bank for the playback
 
 			}
 		});
 
+		//setting api to use as declared api instance
 		setApi(api);
 
+		//event functions
+
+		//when tabs are loaded, set tracks and remove loading pop up
 		const unsubScore = api.scoreLoaded.on((score) => {
 			setTracks(score.tracks);
 			setIsLoading(false);
 
+			//also apply respective instrument to each track
 			score.tracks.forEach((track, index) => {
 				track.playbackInfo.program =
 					trackPrograms[index] ?? track.playbackInfo.program;
@@ -56,13 +62,19 @@ export default function AlphaTabViewer({ file, files, currentIndex, setCurrentIn
 		});
 
 		let cancelled = false;
+
+		//loading file into alphatabs
 		const loadFile = async () => {
-			setIsLoading(true);
+			setIsLoading(true); //show loading popup
 
-			api.pause();
+			api.pause(); //stop current playbacks
 
+			//converting file to raw bytes for alphatab to parse 
+			//this is what allows tabs to build/render
 			const buffer = await file.arrayBuffer();
 			if (!cancelled) {
+
+				//loads file via ALphaTabs
 				setTimeout(() => {
 					api.load(buffer);
 				}, 0);
@@ -70,15 +82,17 @@ export default function AlphaTabViewer({ file, files, currentIndex, setCurrentIn
 		};
 		loadFile();
 
-
+		//if render started show loading popup
 		const unsubRenderStart = api.renderStarted.on(() => {
 			setIsLoading(true);
 		});
 
+		//if render done remove popup
 		const unsubRenderFinish = api.renderFinished.on(() => {
 			setIsLoading(false);
 		});
 
+		//disable not click during playback to prevent audio bug
 		const unsubNoteUp = api.noteMouseUp.on(() => {});
 
 		const unsubBeatUp = api.beatMouseUp.on(() => {});
@@ -91,15 +105,17 @@ export default function AlphaTabViewer({ file, files, currentIndex, setCurrentIn
 			unsubNoteUp();
 			unsubBeatUp();
 			unsubScore();
-			api.destroy();
+			api.destroy(); //destroy current alphatab instance when file is not being displayed
 		}
-	}, [file]);
+	}, [file]); //whenever new file selected
+
+
 
 	const handleFullscreen = () => {
 	if (mainRef.current) {
 		mainRef.current.requestFullscreen().then(() => {
 		setTimeout(() => {
-			api?.render(); // forces AlphaTab to re-render at new width
+			api?.render(); 
 		}, 100);
 		});
 	}
@@ -121,6 +137,7 @@ export default function AlphaTabViewer({ file, files, currentIndex, setCurrentIn
 
 	return (
 		<div className="at-wrap">
+			{/* while file is being processed */}
 			<div 
 				className='at-overlay'
 				style={{ 
@@ -134,7 +151,8 @@ export default function AlphaTabViewer({ file, files, currentIndex, setCurrentIn
 			<div className="at-content">
 				{/* menu for selecting between uploaded tracks */}
 				<div className="at-sidebar"> 
-					{files.map((f, index) => (
+					{/* get uploaded files for files list */}
+					{files.map((f, index) => ( 
 					<button
 						key={index}
 						onClick={() => setCurrentIndex(index)} //select file
@@ -190,6 +208,8 @@ export default function AlphaTabViewer({ file, files, currentIndex, setCurrentIn
 					tracks={api?.tracks ?? []}
 					trackPrograms={trackPrograms}
 					setTrackPrograms={setTrackPrograms}
+
+					//function for reloading tabs (re renders entirely)
 					reloadFile={async () => {
 						if (!api) return;
 
