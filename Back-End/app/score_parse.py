@@ -3,8 +3,8 @@ from music21 import (
     converter,
     note,
     meter,
-    key,
     chord,
+    expressions
 )
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -94,14 +94,17 @@ def should_keep_element(ele: note.GeneralNote | chord.Chord, use_upper_staff_onl
 
 
 def collect_midi_pitches(old_measures, use_upper_staff_only) -> list[int]:
+    """Collect MIDI pitches from all measures using recurse() to dig into voices."""
     midi_pitches = []
     for old_measure in old_measures:
-        for ele in old_measure.notesAndRests:
+        # Use recurse() to match the second pass in build_measure
+        for ele in old_measure.recurse().notesAndRests:
             if not should_keep_element(ele, use_upper_staff_only):
                 continue
             if isinstance(ele, note.Note):
                 midi_pitches.append(ele.pitch.midi)
             elif isinstance(ele, chord.Chord):
+                # get the midi pitch of the highest note, for now
                 midi_pitches.append(ele.notes[-1].pitch.midi)
     return midi_pitches
 
