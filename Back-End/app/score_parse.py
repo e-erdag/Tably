@@ -4,7 +4,6 @@ from music21 import (
     note,
     meter,
     chord,
-    expressions
 )
 import xml.etree.ElementTree as ET
 from pathlib import Path

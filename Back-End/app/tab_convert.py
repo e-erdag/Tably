@@ -129,6 +129,9 @@ def build_measure(
             assignments = assign_chord_strings(shifted_notes, anchor_fret=sf.fret)
 
             for n_i, (n, sf) in enumerate(assignments):
+                if i+1 in range(28, 34):
+                    print(f"  measure={i+1} n_i={n_i}, pitch={n.pitch}, string={sf.string}, fret={sf.fret}, offset={ele.offset}")
+
                 n.articulations.append(articulations.StringIndication(sf.string))
                 n.articulations.append(articulations.FretIndication(sf.fret))
 
@@ -185,7 +188,9 @@ def build_measure(
 
 def inject_chords(tree: ET.ElementTree, chord_indices: list[int]) -> ET.ElementTree:
     root = tree.getroot()
+    assert root is not None
     all_notes = root.findall('.//note')
+    
     for i in chord_indices:
         if i >= len(all_notes):
             continue

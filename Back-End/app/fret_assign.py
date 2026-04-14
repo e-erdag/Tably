@@ -66,6 +66,12 @@ def note_cost(prev: StringFret, curr: StringFret) -> float:
     return fret_cost + pos_cost + open
 
 def chord_cost(assignment: list[tuple[note.Note, StringFret]], anchor_fret: int) -> tuple[float, float, float]:
+    # If two string-fret assignments are on the same string, this
+    #  cannot be a valid chord
+    strings = [sf.string for _, sf in assignment]
+    if len(set(strings)) < len(strings):
+        return (float('inf'), float('inf'), float('inf'))
+    
     frets = [sf.fret for _, sf in assignment if sf.fret > 0]
     span = (max(frets) - min(frets)) if frets else 0
     
