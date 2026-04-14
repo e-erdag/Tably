@@ -43,9 +43,11 @@ function FileDropBox({ onFileConverted }) {
       const disposition = response.headers.get("Content-Disposition");
       const match = disposition?.match(/filename="(.+)"/);
       const downloadName = match?.[1] || "converted.musicxml";
+      const displayName = file.name.replace(/\.[^/.]+$/, '').replace(/ /g, '_') + '.musicxml';
+
 
       // Send the converted file to parent
-      onFileConverted({ blob, name: downloadName });
+      onFileConverted({ blob, name: displayName });
 
     } catch (error) {
       setError(`Error: ${error.message}`);
