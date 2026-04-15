@@ -14,17 +14,19 @@ interface AlphaTabViewerProps {
 }
 
 export default function AlphaTabViewer({ file, files, currentIndex, setCurrentIndex, convertingIndices }: AlphaTabViewerProps) {
-
-  	const mainRef = useRef<HTMLDivElement>(null); //where alphatabs will render tabs
+  const mainRef = useRef<HTMLDivElement>(null); //where alphatabs will render tabs
 	const viewportRef = useRef<HTMLDivElement>(null); //making tabs scrollable
 	const [isLoading, setIsLoading] = useState(true); //load state
 	const [api, setApi] = useState<AlphaTabApi>(); //the alphatab api instance
-	const [tracks, setTracks] = useState<any[]>([]); //stores tracks (music to play) TODO
 	const [trackPrograms, setTrackPrograms] = useState<Record<number, number>>({}); //selected instrument to play
-	const [isFullscreen, setIsFullscreen] = useState(false); //stores wether fullscreen mode active or not
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [metronomeOn, setMetronomeOn] = useState(false);
 
 	useEffect(() => {
-		// create instance of AlphaTabs api
+		if(!file) return ;
+    setMetronomeOn(false);
+
+    // create instance of AlphaTabs api
 		const api = new AlphaTabApi(mainRef.current!, {
 			notation: {
 				rhythmMode: TabRhythmMode.Hidden // Used to hide stem lines
@@ -39,21 +41,36 @@ export default function AlphaTabViewer({ file, files, currentIndex, setCurrentIn
 				enableCursor: true, //moving cursor
 				enableUserInteraction: true, //clicking interaction
 				scrollElement: viewportRef.current!, //autoscroll
-				soundFont: '/soundfont/sonivox.sf2', //sound bank for the playback
-
 			}
 		});
+
+    const loadSoundFonts = async () => {
+      const [sonivox, guitar] = await Promise.all([
+        // sonivox.sf2 soundfont used for guaranteed metronome playback
+        fetch('/soundfont/sonivox.sf3')
+          .then(r => r.arrayBuffer()),
+        // custom .sf2 soundfont, so you can use whatever guitar sound
+        fetch('/soundfont/Classical-Guitar-Hedsound.sf3')
+          .then(r => r.arrayBuffer()),
+      ]);
+
+      api.loadSoundFont(new Uint8Array(sonivox), false);
+      // append = true, so the guitar soundfont is layered on top of sonivox.
+      // this preserves the metronome playback and uses the custom guitar font  
+      api.loadSoundFont(new Uint8Array(guitar), true);
+    };
+
+    loadSoundFonts();
 
 		//setting api to use as declared api instance
 		setApi(api);
 
-		//event functions
+		const unsubPlayerState = api.playerStateChanged.on((args) =>{
+      setIsPlaying(args.state === 1);
+    });
 
 		//when tabs are loaded, set tracks and remove loading pop up
 		const unsubScore = api.scoreLoaded.on((score) => {
-			setTracks(score.tracks);
-			setIsLoading(false);
-
 			//also apply respective instrument to each track
 			score.tracks.forEach((track, index) => {
 				track.playbackInfo.program =
@@ -65,7 +82,8 @@ export default function AlphaTabViewer({ file, files, currentIndex, setCurrentIn
 
 		//loading file into alphatabs
 		const loadFile = async () => {
-			setIsLoading(true); //show loading popup
+			if(!file) return;
+      setIsLoading(true); //show loading popup
 
 			api.pause(); //stop current playbacks
 
@@ -105,6 +123,7 @@ export default function AlphaTabViewer({ file, files, currentIndex, setCurrentIn
 			unsubNoteUp();
 			unsubBeatUp();
 			unsubScore();
+      unsubPlayerState();
 			api.destroy(); //destroy current alphatab instance when file is not being displayed
 		}
 	}, [file]); //whenever new file selected
@@ -185,7 +204,7 @@ export default function AlphaTabViewer({ file, files, currentIndex, setCurrentIn
 					{convertingIndices?.includes(currentIndex) && (
 						<div className="at-overlay" style={{ display: 'flex' }}>
 							<div className="at-overlay-content">
-								Waiting for convertion...
+								Converting Sheet Music...
 							</div>
 						</div>
 					)}
@@ -194,7 +213,7 @@ export default function AlphaTabViewer({ file, files, currentIndex, setCurrentIn
 					{isLoading && !convertingIndices?.includes(currentIndex) && (
 						<div className="at-overlay" style={{ display: 'flex' }}>
 							<div className="at-overlay-content">
-								Loading Music Sheet...
+								Loading Guitar Tab...
 							</div>
 						</div>
 					)}
@@ -202,28 +221,29 @@ export default function AlphaTabViewer({ file, files, currentIndex, setCurrentIn
 			</div>
 
 			{/*Passing tracks and api to AlphaTabControls for playback + sound selection*/}
-			<div className="at-controls">
-				<AlphaTabControls
-					api={api}
-					tracks={api?.tracks ?? []}
-					trackPrograms={trackPrograms}
-					setTrackPrograms={setTrackPrograms}
+      <AlphaTabControls
+        api={api}
+        tracks={api?.tracks ?? []}
+        trackPrograms={trackPrograms}
+        setTrackPrograms={setTrackPrograms}
+        isPlaying={isPlaying}
+        metronomeOn={metronomeOn}
+        setMetronomeOn={setMetronomeOn}
 
-					//function for reloading tabs (re renders entirely)
-					reloadFile={async () => {
-						if (!api) return;
+        //function for reloading tabs (re renders entirely)
+        reloadFile={async () => {
+          if (!api) return;
 
-						api.pause();
+          api.pause();
 
-						const buffer = await file.arrayBuffer();
+          const buffer = await file.arrayBuffer();
 
-						setTimeout(() => {
-							api.load(buffer);
-						}, 0);
-					}}
-					onFullscreen={handleFullscreen}
-				/>
-			</div>
+          setTimeout(() => {
+            api.load(buffer);
+          }, 0);
+        }}
+        onFullscreen={handleFullscreen}
+      />
 		</div>
 	);
 }

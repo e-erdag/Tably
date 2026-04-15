@@ -119,7 +119,7 @@ def build_measure(
                 sf = string_frets[sf_idx]
                 sf_idx += 1
             else:
-                sf = get_closest_string_fret(ele.notes[-1].pitch.midi + pitch_shift)
+                sf = get_closest_string_fret(ele.notes[0].pitch.midi + pitch_shift)
             
             shifted_notes = []
             for n in ele.notes:

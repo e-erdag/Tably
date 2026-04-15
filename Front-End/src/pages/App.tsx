@@ -4,6 +4,8 @@ import '../styles/App.css';
 import FileDropBox from '../components/FileDropBox';
 import DescriptionBox from "../components/DescriptionBox";
 import GuitarTabPage from "./GuitarTabPage";
+import { Button, createTheme, MantineProvider } from '@mantine/core';
+import '@mantine/core/styles.css'
 
 function Home() {
   const navigate = useNavigate();
@@ -38,7 +40,7 @@ function Home() {
 
         <div className="instruction-box">
           <h3>What can I do?</h3>
-          <p>After convertion you can upload new files, make use of a suite of playback features, or download it for future use!</p>
+          <p>After conversion you can upload new files, make use of a suite of playback features, or download it for future use!</p>
         </div>
 
       </div>
@@ -47,9 +49,9 @@ function Home() {
   );
 }
 
-function App() {
+export default function App() {
   return (
-    <>
+    <MantineProvider theme={theme}>
       <header className="tably-header">
         <h1>Tably𝄞</h1>
       </header>
@@ -58,7 +60,26 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/tab" element={<GuitarTabPage />} />
       </Routes>
-    </>
+    </MantineProvider>
   );
 }
-export default App;
+
+
+const theme = createTheme({
+  defaultRadius: 'md',
+  fontFamily: 'Inter, sans-serif',
+  components: {
+    Button: Button.extend({
+      defaultProps: {
+        variant: 'gradient',
+        gradient: { from: '#F56960', to: '#ff8a75', deg: 135 },
+      },
+      styles: {
+        root: {
+          boxShadow: '0 4px 12px rgba(245, 105, 96, 0.25)',
+          transition: 'all 0.25s ease'
+        }
+      }
+    })
+  }
+})

@@ -63,7 +63,7 @@ def note_cost(prev: StringFret, curr: StringFret) -> float:
     pos_cost_base = 1.2   
     pos_cost = pos_cost_base ** curr.fret
     
-    return fret_cost + pos_cost + open
+    return fret_cost  + pos_cost + open
 
 def chord_cost(assignment: list[tuple[note.Note, StringFret]], anchor_fret: int) -> tuple[float, float, float]:
     # If two string-fret assignments are on the same string, this

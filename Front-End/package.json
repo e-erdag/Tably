@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@coderline/alphatab": "^1.8.1",
+    "@mantine/core": "^9.0.2",
+    "@tabler/icons-react": "^3.41.1",
     "@vitejs/plugin-basic-ssl": "^2.1.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
