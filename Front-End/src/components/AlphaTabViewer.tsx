@@ -1,229 +1,248 @@
 import { useEffect, useRef, useState } from "react";
-import { TabRhythmMode, AlphaTabApi, type json } from '@coderline/alphatab';
-import '../styles/AlphaTabViewer2.css'
+import { TabRhythmMode, AlphaTabApi } from '@coderline/alphatab';
+import '../styles/AlphaTabViewer2.css';
 import AlphaTabControls from "./AlphaTabControls";
 
-
-//interface containg all the data coming from GuitarTabPage
 interface AlphaTabViewerProps {
-	file: File; //currently selected file to view
-	files: File[]; //all uploaded files
-	currentIndex: number; //currently selected file
-	setCurrentIndex: (index: number) => void; //function that changed current file
-	convertingIndices?: number[]; //for keep track of files in process of converting
+  file: File;
+  files: File[];
+  currentIndex: number;
+  setCurrentIndex: (index: number) => void;
+  convertingIndices?: number[];
+  getSvg?: (fn: () => SVGElement | null) => void;
+  onUpload?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+
+  // ✅ ADD THIS (we need converted files access)
+  convertedFiles?: File[];
 }
 
-export default function AlphaTabViewer({ file, files, currentIndex, setCurrentIndex, convertingIndices }: AlphaTabViewerProps) {
+export default function AlphaTabViewer({
+  file,
+  files,
+  currentIndex,
+  setCurrentIndex,
+  convertingIndices,
+  getSvg,
+  onUpload,
+  convertedFiles = [], // default safe
+}: AlphaTabViewerProps) {
 
-  	const mainRef = useRef<HTMLDivElement>(null); //where alphatabs will render tabs
-	const viewportRef = useRef<HTMLDivElement>(null); //making tabs scrollable
-	const [isLoading, setIsLoading] = useState(true); //load state
-	const [api, setApi] = useState<AlphaTabApi>(); //the alphatab api instance
-	const [tracks, setTracks] = useState<any[]>([]); //stores tracks (music to play) TODO
-	const [trackPrograms, setTrackPrograms] = useState<Record<number, number>>({}); //selected instrument to play
-	const [isFullscreen, setIsFullscreen] = useState(false); //stores wether fullscreen mode active or not
+  const mainRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
 
-	useEffect(() => {
-		// create instance of AlphaTabs api
-		const api = new AlphaTabApi(mainRef.current!, {
-			notation: {
-				rhythmMode: TabRhythmMode.Hidden // Used to hide stem lines
-				// Not granular, so will need to be changed if we want to display
-				// sheet music next to guitar tab. 
-			},
-			core: {
-				fontDirectory: '/font/'
-			},
-			player: {
-				enablePlayer: true, //enables playback
-				enableCursor: true, //moving cursor
-				enableUserInteraction: true, //clicking interaction
-				scrollElement: viewportRef.current!, //autoscroll
-				soundFont: '/soundfont/sonivox.sf2', //sound bank for the playback
+  const [isLoading, setIsLoading] = useState(true);
+  const [api, setApi] = useState<AlphaTabApi>();
+  const [tracks, setTracks] = useState<any[]>([]);
+  const [trackPrograms, setTrackPrograms] = useState<Record<number, number>>({});
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
-			}
-		});
+  useEffect(() => {
+    if (!getSvg) return;
+    getSvg(() => mainRef.current?.querySelector("svg") ?? null);
+  }, [getSvg]);
 
-		//setting api to use as declared api instance
-		setApi(api);
+  useEffect(() => {
+    if (!mainRef.current || !viewportRef.current) return;
 
-		//event functions
+    const alphaApi = new AlphaTabApi(mainRef.current, {
+      notation: {
+        rhythmMode: TabRhythmMode.Hidden,
+      },
+      core: {
+        fontDirectory: '/font/',
+      },
+      player: {
+        enablePlayer: true,
+        enableCursor: true,
+        enableUserInteraction: true,
+        scrollElement: viewportRef.current,
+        soundFont: '/soundfont/sonivox.sf2',
+      },
+    });
 
-		//when tabs are loaded, set tracks and remove loading pop up
-		const unsubScore = api.scoreLoaded.on((score) => {
-			setTracks(score.tracks);
-			setIsLoading(false);
+    setApi(alphaApi);
 
-			//also apply respective instrument to each track
-			score.tracks.forEach((track, index) => {
-				track.playbackInfo.program =
-					trackPrograms[index] ?? track.playbackInfo.program;
-			});
-		});
+    const unsubScore = alphaApi.scoreLoaded.on((score) => {
+      setTracks(score.tracks);
+      setTrackPrograms(prev => {
+        score.tracks.forEach((track, index) => {
+          if (prev[index] !== undefined) {
+            track.playbackInfo.program = prev[index];
+          }
+        });
+        return prev;
+      });
+    });
 
-		let cancelled = false;
+    let cancelled = false;
 
-		//loading file into alphatabs
-		const loadFile = async () => {
-			setIsLoading(true); //show loading popup
+    const loadFile = async () => {
+      setIsLoading(true);
+      alphaApi.pause();
+      const buffer = await file.arrayBuffer();
+      if (!cancelled) {
+        setTimeout(() => {
+          alphaApi.load(buffer);
+        }, 0);
+      }
+    };
 
-			api.pause(); //stop current playbacks
+    loadFile();
 
-			//converting file to raw bytes for alphatab to parse 
-			//this is what allows tabs to build/render
-			const buffer = await file.arrayBuffer();
-			if (!cancelled) {
+    const unsubRenderStart = alphaApi.renderStarted.on(() => setIsLoading(true));
+    const unsubRenderFinish = alphaApi.renderFinished.on(() => setIsLoading(false));
 
-				//loads file via ALphaTabs
-				setTimeout(() => {
-					api.load(buffer);
-				}, 0);
-			}
-		};
-		loadFile();
+    return () => {
+      cancelled = true;
+      unsubRenderStart();
+      unsubRenderFinish();
+      unsubScore();
+      alphaApi.destroy();
+    };
+  }, [file]);
 
-		//if render started show loading popup
-		const unsubRenderStart = api.renderStarted.on(() => {
-			setIsLoading(true);
-		});
+  const handleFullscreen = () => {
+    if (!wrapRef.current) return;
 
-		//if render done remove popup
-		const unsubRenderFinish = api.renderFinished.on(() => {
-			setIsLoading(false);
-		});
+    if (!document.fullscreenElement) {
+      wrapRef.current.requestFullscreen().then(() => {
+        setIsFullscreen(true);
+        setTimeout(() => api?.render(), 100);
+      });
+    } else {
+      document.exitFullscreen().then(() => {
+        setIsFullscreen(false);
+      });
+    }
+  };
 
-		//disable not click during playback to prevent audio bug
-		const unsubNoteUp = api.noteMouseUp.on(() => {});
+  useEffect(() => {
+    const handleFullscreenChange = async () => {
+      const inFullscreen = !!document.fullscreenElement;
+      setIsFullscreen(inFullscreen);
 
-		const unsubBeatUp = api.beatMouseUp.on(() => {});
-		
+      if (!inFullscreen && api) {
+        api.pause();
+        const buffer = await file.arrayBuffer();
+        setTimeout(() => api.load(buffer), 0);
+      }
+    };
 
-		return () => {
-			cancelled = true;
-			unsubRenderStart();
-			unsubRenderFinish();
-			unsubNoteUp();
-			unsubBeatUp();
-			unsubScore();
-			api.destroy(); //destroy current alphatab instance when file is not being displayed
-		}
-	}, [file]); //whenever new file selected
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, [api, file]);
 
+  const isConverting = convertingIndices?.includes(currentIndex) ?? false;
 
+  const currentConvertedFile = convertedFiles?.[currentIndex];
 
-	const handleFullscreen = () => {
-	if (mainRef.current) {
-		mainRef.current.requestFullscreen().then(() => {
-		setTimeout(() => {
-			api?.render(); 
-		}, 100);
-		});
-	}
-	};
+  const downloadCurrentFile = () => {
+	if (!currentConvertedFile) return;
+  
+	const url = URL.createObjectURL(currentConvertedFile);
+  
+	const link = document.createElement("a");
+	link.href = url;
+	link.download = currentConvertedFile.name;
+  
+	document.body.appendChild(link);
+	link.click();
+  
+	document.body.removeChild(link);
+	URL.revokeObjectURL(url);
+  };
 
-	useEffect(() => {
-		const handleFullscreenChange = async () => {
-			if (!document.fullscreenElement && api) {
-			api.pause();
-			const buffer = await file.arrayBuffer();
-			setTimeout(() => { api.load(buffer); }, 0);
-			}
-		};
+  return (
+    <div className="at-wrap" ref={wrapRef}>
 
-		document.addEventListener('fullscreenchange', handleFullscreenChange);
-		return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-	}, [api, file]);
+      {(isConverting || isLoading) && (
+        <div className="at-overlay" style={{ display: 'flex' }}>
+          <div className="at-overlay-content">
+            {isConverting ? "Waiting for conversion..." : "Loading music sheet..."}
+          </div>
+        </div>
+      )}
 
+      <div className="at-content">
 
-	return (
-		<div className="at-wrap">
-			{/* while file is being processed */}
-			<div 
-				className='at-overlay'
-				style={{ 
-					display: isLoading ? 'flex' : 'none'
-				}}
-			>
-				<div className='at-overlay-content' >
-					Music sheet is loading...
-				</div>
-			</div>
-			<div className="at-content">
-				{/* menu for selecting between uploaded tracks */}
-				<div className="at-sidebar"> 
-					{/* get uploaded files for files list */}
-					{files.map((f, index) => ( 
-					<button
-						key={index}
-						onClick={() => setCurrentIndex(index)} //select file
-						style={{
-							margin: '0.3rem',
-							padding: '0.5rem',
-							borderRadius: '6px',
-							border: 'none',
-							cursor: 'pointer',
-							background: index === currentIndex ? '#F56960' : '#FFFFFF33',
-							color: 'white',
-							width: '90%'
-						}}
-					>
-						{convertingIndices?.includes(index)
-							? "Loading…"  // if file is still converting
-							: f.name.length > 10
-								? f.name.slice(0, 10) + "..."
-								: f.name
-						}
-					</button>
-				))}
-				</div>
-				
-				<div className="at-viewport" ref={viewportRef}>
-					{/* <div className="at-main"></div> */}
-					<div className="at-main" ref={mainRef}></div>
+        <div className="at-sidebar">
+          <label className="at-sidebar-upload">
+            + Add File
+            <input
+              type="file"
+              accept=".mscz,.musicxml,.jpg,.png"
+              style={{ display: 'none' }}
+              onChange={onUpload}
+            />
+          </label>
 
-					{/*if current file still converting*/}
-					{convertingIndices?.includes(currentIndex) && (
-						<div className="at-overlay" style={{ display: 'flex' }}>
-							<div className="at-overlay-content">
-								Waiting for convertion...
-							</div>
-						</div>
-					)}
+          {files.map((f, index) => (
+            <button
+              key={index}
+              onClick={() => setCurrentIndex(index)}
+              style={{
+                margin: '0.3rem',
+                padding: '0.5rem',
+                borderRadius: '6px',
+                border: 'none',
+                cursor: 'pointer',
+                background: index === currentIndex ? '#F56960' : '#FFFFFF33',
+                color: 'white',
+                width: '90%',
+              }}
+            >
+              {convertingIndices?.includes(index)
+                ? "Loading…"
+                : f.name.length > 10
+                  ? f.name.slice(0, 10) + "..."
+                  : f.name}
+            </button>
+          ))}
 
-					{/*If current file is being loaded by alphatab*/}
-					{isLoading && !convertingIndices?.includes(currentIndex) && (
-						<div className="at-overlay" style={{ display: 'flex' }}>
-							<div className="at-overlay-content">
-								Loading Music Sheet...
-							</div>
-						</div>
-					)}
-				</div>
-			</div>
+          {/* ✅ NEW: Download button at bottom */}
+          <div style={{ marginTop: 'auto', padding: '0.5rem' }}>
+            <button
+              onClick={downloadCurrentFile}
+              style={{
+                width: '100%',
+                padding: '0.6rem',
+                borderRadius: '6px',
+                border: 'none',
+                cursor: 'pointer',
+                background: currentConvertedFile ? '#F56960' : '#444',
+                color: 'white',
+                opacity: currentConvertedFile ? 1 : 0.5
+              }}
+              disabled={!currentConvertedFile}
+            >
+              Download Tab
+            </button>
+          </div>
+        </div>
 
-			{/*Passing tracks and api to AlphaTabControls for playback + sound selection*/}
-			<div className="at-controls">
-				<AlphaTabControls
-					api={api}
-					tracks={api?.tracks ?? []}
-					trackPrograms={trackPrograms}
-					setTrackPrograms={setTrackPrograms}
+        <div className="at-viewport" ref={viewportRef}>
+          <div className="at-main" ref={mainRef}></div>
+        </div>
 
-					//function for reloading tabs (re renders entirely)
-					reloadFile={async () => {
-						if (!api) return;
+      </div>
 
-						api.pause();
-
-						const buffer = await file.arrayBuffer();
-
-						setTimeout(() => {
-							api.load(buffer);
-						}, 0);
-					}}
-					onFullscreen={handleFullscreen}
-				/>
-			</div>
-		</div>
-	);
+      <div className="at-controls">
+        <AlphaTabControls
+          api={api}
+          tracks={api?.tracks ?? []}
+          trackPrograms={trackPrograms}
+          setTrackPrograms={setTrackPrograms}
+          reloadFile={async () => {
+            if (!api) return;
+            api.pause();
+            const buffer = await file.arrayBuffer();
+            setTimeout(() => api.load(buffer), 0);
+          }}
+          onFullscreen={handleFullscreen}
+          isFullscreen={isFullscreen}
+        />
+      </div>
+    </div>
+  );
 }
