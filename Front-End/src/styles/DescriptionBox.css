@@ -33,11 +33,11 @@
   font-size: 2rem;
 }
 
-@keyframes subtleShift {
+/* @keyframes subtleShift {
   0%   { transform: translateY(0px); }
   50%  { transform: translateY(-6px); }
   100% { transform: translateY(0px); }
-}
+} */
 
 .shift-slow {
   display: inline-block;

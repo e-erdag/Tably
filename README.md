@@ -35,7 +35,7 @@ This starts:
 2. Open `http://localhost:5173`
 3. Upload one of these file types:
    `.mscz`, `.musicxml`, `.xml`, `.png`, `.jpg`, `.jpeg`
-4. Rhe app should download a `.musicxml` file after conversion
+4. The app should download a `.musicxml` file after conversion
 
 ## Test the backend directly
 

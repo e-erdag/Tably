@@ -1,10 +1,8 @@
-
 import { useState, Dispatch, SetStateAction } from "react";
 import { AlphaTabApi } from "@coderline/alphatab";
 import { Button, Group, Popover, SimpleGrid, Stack } from "@mantine/core";
 import { IconMetronome, IconPlayerPauseFilled, IconPlayerPlayFilled, IconPlayerSkipBackFilled } from '@tabler/icons-react'
 
-//interface to keep track of properties 
 interface AlphaTabControlsProps {
 	api?: AlphaTabApi; //api instance
   isPlaying: boolean; // Whether the score is playing
@@ -41,24 +39,36 @@ export default function AlphaTabControls({
 		api.stop(); // stops playback and resets position
 	};
 
-	//change speed api call
-	const changeSpeed = (newSpeed: number) => {
-		if (!api) return;
-		api.playbackSpeed = newSpeed; // correct AlphaTab speed prop
-		setSpeed(newSpeed);
-	};
+  const changeSpeed = (newSpeed: number) => {
+    if (!api) return;
+    api.playbackSpeed = newSpeed;
+    setSpeed(newSpeed);
+  };
 
-	//Enable/disbale metronome api call
-	const toggleMetronome = () => {
-		if (!api) return;
-		// using volume toggle since for some reason Alphatab doesnt have on and off call for metronome
-		if (metronomeOn) {
-			api.metronomeVolume = 0;
-		} else {
-			api.metronomeVolume = 1;
-		}
-		setMetronomeOn(!metronomeOn);
-	};
+  const toggleMetronome = () => {
+    if (!api) return;
+    if (metronomeOn) {
+      api.metronomeVolume = 0;
+    } else {
+      api.metronomeVolume = 1;
+    }
+    setMetronomeOn(!metronomeOn);
+  };
+
+  const instruments = [
+    { name: "Piano", program: 0 },
+    { name: "Acoustic Guitar", program: 24 },
+    { name: "Bass", program: 32 },
+    { name: "Drums", program: 115 },
+  ];
+
+  const getIconFromProgram = (program: number) => {
+    if ([24, 25, 26, 27, 28].includes(program)) return "🎸";
+    if (program === 0) return "🎹";
+    if ([32, 33].includes(program)) return "🎸";
+    if (program === 115) return "🥁";
+    return "🎵";
+  };
 
 	const speeds = [0.25, 0.5, 0.75, 1, 1.5, 1.75, 2];
 

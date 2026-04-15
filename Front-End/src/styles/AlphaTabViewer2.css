@@ -114,3 +114,37 @@
   max-width: 100vw !important;
   box-sizing: border-box;
 }
+
+.at-sidebar-upload {
+  display: block;
+  width: 90%;
+  margin: 0.3rem;
+  padding: 0.5rem;
+  border-radius: 6px;
+  border: 1px dashed #FFFFFF66;
+  cursor: pointer;
+  color: white;
+  text-align: center;
+  font-size: 0.85rem;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.at-sidebar-upload:hover {
+  background: #FFFFFF22;
+}
+
+.at-wrap:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
+}
+
+.at-wrap:-moz-full-screen {
+  width: 100vw;
+  height: 100vh;
+}
+
+.at-wrap:fullscreen {
+  width: 100vw;
+  height: 100vh;
+}
