@@ -9,16 +9,15 @@ function GuitarTabPage() {
 
   const initialFile = location.state?.file;
 
-  const [files, setFiles] = useState(initialFile ? [initialFile] : []); // all uploaded files
-  const [convertedFiles, setConvertedFiles] = useState(initialFile ? [initialFile] : []); // files done converting
+  const [files, setFiles] = useState(initialFile ? [initialFile] : []);
+  const [convertedFiles, setConvertedFiles] = useState(initialFile ? [initialFile] : []);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [convertingIndices, setConvertingIndices] = useState([]); // tracks which files are converting
+  const [convertingIndices, setConvertingIndices] = useState([]);
 
   if (files.length === 0) {
-    return <Navigate to='/' />
+    return <Navigate to='/' />;
   }
 
-  // Handle uploading a new file
   const handleNewFile = async (e) => {
     if (!e.target.files || e.target.files.length === 0) return;
 
@@ -46,11 +45,8 @@ function GuitarTabPage() {
       }
 
       const blob = await response.blob();
-      const disposition = response.headers.get("Content-Disposition");
-      const match = disposition?.match(/filename="(.+)"/);
-      const downloadName = match?.[1] || "converted.musicxml";
-
-      const convertedFile = new File([blob], downloadName);
+      const displayName = newFile.name.replace(/\.[^/.]+$/, '').replace(/ /g, '_') + '.musicxml';
+      const convertedFile = new File([blob], displayName);
 
       setConvertedFiles(prev => [...prev, convertedFile]);
       setConvertingIndices(prev => prev.filter(i => i !== newIndex));
@@ -63,23 +59,18 @@ function GuitarTabPage() {
 
   return (
     <>
-      <div className="tab-page">
-        <button onClick={() => navigate('/')}>Return</button>
+      <AlphaTabViewer
+        file={convertedFiles[currentIndex]}
+        files={files}
+        convertingIndices={convertingIndices}
+        currentIndex={currentIndex}
+        setCurrentIndex={setCurrentIndex}
+        onUpload={handleNewFile}
+        convertedFiles={convertedFiles}   // ✅ THIS WAS MISSING
+      />
 
-        <h2>Your file is ready!</h2>
+      {/* <div className="tab-page">
 
-        {/* Upload another file */}
-        <label className="file-dropbox-label">
-          Upload Another File
-          <input
-            type="file"
-            className="file-dropbox-input"
-            onChange={handleNewFile}
-            accept=".mscz,.musicxml,.jpg,.png"
-          />
-        </label>
-
-        {/* Download current file */}
         {convertedFiles[currentIndex] && (
           <a
             href={URL.createObjectURL(convertedFiles[currentIndex])}
@@ -88,15 +79,7 @@ function GuitarTabPage() {
             Download Current File
           </a>
         )}
-      </div>
-
-      <AlphaTabViewer
-        file={convertedFiles[currentIndex]}
-        files={files}
-        convertingIndices={convertingIndices}
-        currentIndex={currentIndex}
-        setCurrentIndex={setCurrentIndex}
-      />
+      </div> */}
     </>
   );
 }

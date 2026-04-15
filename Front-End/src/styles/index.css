@@ -1,12 +1,33 @@
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  /* === TABLY DESIGN TOKENS === */
+  --color-primary: #F56960;
+  --color-primary-dark: #d94f47;
+  --color-navy: #173753;
+  --color-purple: #8B95C9;
+
+  --color-bg-card-light: rgba(255, 255, 255, 0.75);
+  --color-bg-card-white: #FFFFFF;
+  --color-bg-upload: linear-gradient(145deg, var(--color-purple), var(--color-navy));
+  --color-bg-description: linear-gradient(145deg, var(--color-bg-card-white), var(--color-bg-card-white));
+
+  --color-text-body: #121212;
+  --color-text-navy: #173753;
+  --color-text-white: #FFFFFF;
+  --color-text-white-muted: rgba(255, 255, 255, 0.8);
+
+  --font-heading: 'Abril Fatface', serif;
+  --font-body: 'Inter', sans-serif;
+
+  --radius-card: 12px;
+  --radius-btn: 8px;
+  --shadow-card: 0 6px 15px rgba(18, 18, 18, 0.3);
+  --shadow-card-hover: 0 10px 25px rgba(18, 18, 18, 0.5);
+  /* ================================ */
+
   line-height: 1.5;
   font-weight: 400;
-
+  font-family: var(--font-body);
   color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;

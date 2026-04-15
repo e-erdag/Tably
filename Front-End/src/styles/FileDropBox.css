@@ -1,37 +1,42 @@
 .file-dropbox-container {
-  width: 425px;
-  margin: 3rem auto;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  box-sizing: border-box;
   padding: 2rem;
-  background: linear-gradient(145deg, #8B95C9, #173753); 
-  border-radius: 12px;
-  box-shadow: 0 6px 15px rgba(18, 18, 18, 0.4);
+  background: var(--color-bg-upload);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  overflow: hidden;
 }
 
 .file-dropbox-container:hover {
   transform: translateY(-5px);
-  box-shadow: 0 10px 25px rgba(18, 18, 18, 0.5);
+  box-shadow: var(--shadow-card-hover);
 }
 
 .file-dropbox-label {
-  background-color: #F56960; 
-  color: #FFFFFF;
+  font-family: var(--font-body);
+  background-color: var(--color-primary);
+  color: var(--color-text-white);
   padding: 0.8rem 1.5rem;
-  border-radius: 8px;
+  border-radius: var(--radius-btn);
   cursor: pointer;
   font-weight: bold;
   transition: background-color 0.2s ease;
   text-align: center;
   display: flex;
-  justify-content: center; 
-  align-items: center;  
-        
+  justify-content: center;
+  align-items: center;
 }
 
 .file-dropbox-label:hover {
-  background-color: #173753; 
+  background-color: var(--color-navy);
 }
 
 .file-dropbox-input {
@@ -39,33 +44,27 @@
 }
 
 .file-dropbox-hint {
+  font-family: var(--font-body);
   margin-top: 1rem;
   font-size: 0.9rem;
-  color: #FFFFFFCC; 
+  color: var(--color-text-white-muted);
   text-align: center;
 }
 
-
-.file-dropbox-input {
-  display: none;
-}
-
-
-/* awaiting the convertion */
 .file-dropbox-loading {
+  font-family: var(--font-body);
   margin-top: 1rem;
   font-size: 0.95rem;
-  color: #FFFFFF; 
+  color: var(--color-text-white);
   text-align: center;
   font-weight: bold;
   padding: 0.5rem 1rem;
-  border-radius: 8px;
+  border-radius: var(--radius-btn);
   background: rgba(255, 255, 255, 0.1);
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
   transition: background 0.2s ease;
 }
 
-/* Download link container */
 .converted-file-container {
   margin-top: 2rem;
   display: flex;
@@ -74,12 +73,11 @@
   gap: 1rem;
 }
 
-/* Download button styled like FileDropBox label */
 .converted-file-container a {
-  background-color: #F56960; 
-  color: #FFFFFF;
+  background-color: var(--color-primary);
+  color: var(--color-text-white);
   padding: 0.8rem 1.5rem;
-  border-radius: 8px;
+  border-radius: var(--radius-btn);
   text-decoration: none;
   font-weight: bold;
   text-align: center;
@@ -90,21 +88,22 @@
 }
 
 .converted-file-container a:hover {
-  background-color: #173753;
+  background-color: var(--color-navy);
   transform: translateY(-2px);
-  box-shadow: 0 6px 15px rgba(18, 18, 18, 0.4);
+  box-shadow: var(--shadow-card);
 }
 
-/* Optional: message above download button */
 .converted-file-container p {
+  font-family: var(--font-body);
   font-size: 0.95rem;
-  color: #FFFFFFCC;
+  color: var(--color-text-white-muted);
   text-align: center;
   margin: 0;
 }
 
 .file-dropbox-error {
-    color: #ffffff;
-    font-size: 1.2rem;
-    text-align: center;
+  font-family: var(--font-body);
+  color: var(--color-text-white);
+  font-size: 1.2rem;
+  text-align: center;
 }

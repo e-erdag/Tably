@@ -128,11 +128,11 @@ async def convert_file(file: UploadFile = File(...)) -> Response:
 
         # send the result back as a downloadable musicxml file.
         output_name = sanitize_filename(Path(file.filename).stem + ".musicxml")
-        headers = {"Content-Disposition": f'attachment; filename="{output_name}"'}
+        # headers = {"Content-Disposition": f'attachment; filename="{output_name}"'}
 
         logger.info("Converted %s to %s", file.filename, output_path)
         return Response(
             content=musicxml_content,
             media_type="application/vnd.recordare.musicxml+xml",
-            headers=headers,
+            # headers=headers,
         )
