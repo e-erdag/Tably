@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Routes, Route, useNavigate } from 'react-router-dom';
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import '../styles/App.css';
 import FileDropBox from '../components/FileDropBox';
 import DescriptionBox from "../components/DescriptionBox";
@@ -48,10 +48,22 @@ function Home() {
 }
 
 function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const isTabPage = location.pathname === "/tab";
+
   return (
     <>
       <header className="tably-header">
         <h1>Tably𝄞</h1>
+
+        {/* ✅ Show Return button ONLY on /tab */}
+        {isTabPage && (
+          <button className="return-btn" onClick={() => navigate("/")}>
+            Return
+          </button>
+        )}
       </header>
 
       <Routes>
@@ -61,4 +73,5 @@ function App() {
     </>
   );
 }
+
 export default App;
