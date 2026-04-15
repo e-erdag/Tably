@@ -36,6 +36,7 @@ export default function AlphaTabViewer({
   const [tracks, setTracks] = useState<any[]>([]);
   const [trackPrograms, setTrackPrograms] = useState<Record<number, number>>({});
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
 
   useEffect(() => {
     if (!getSvg) return;
@@ -115,6 +116,114 @@ export default function AlphaTabViewer({
         setIsFullscreen(false);
       });
     }
+  };
+
+  const downloadMusicXML = () => {
+    if (!currentConvertedFile) return;
+  
+    const url = URL.createObjectURL(currentConvertedFile);
+  
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = currentConvertedFile.name;
+  
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadPNG = async () => {
+    const viewport = viewportRef.current;
+    const container = mainRef.current;
+  
+    if (!viewport || !container) return;
+  
+    // STEP 1: Force full render by scrolling
+    const totalScroll = viewport.scrollHeight;
+    const step = viewport.clientHeight;
+  
+    for (let y = 0; y < totalScroll; y += step) {
+      viewport.scrollTop = y;
+  
+      // Wait for AlphaTab to render
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  
+    // Scroll back to top
+    viewport.scrollTop = 0;
+    await new Promise((r) => setTimeout(r, 100));
+  
+    // STEP 2: NOW collect all SVGs
+    const svgs = Array.from(container.querySelectorAll("svg"));
+    if (svgs.length === 0) return;
+  
+    const sizes = svgs.map((svg) => {
+      const width = svg.viewBox.baseVal.width || svg.clientWidth;
+      const height = svg.viewBox.baseVal.height || svg.clientHeight;
+      return { svg, width, height };
+    });
+  
+    const totalWidth = Math.max(...sizes.map(s => s.width));
+    const totalHeight = sizes.reduce((sum, s) => sum + s.height, 0);
+  
+    const canvas = document.createElement("canvas");
+    canvas.width = totalWidth;
+    canvas.height = totalHeight;
+  
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+  
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, totalWidth, totalHeight);
+  
+    let offsetY = 0;
+    let pending = sizes.length;
+  
+    sizes.forEach(({ svg, width, height }) => {
+      const serializer = new XMLSerializer();
+  
+      const clone = svg.cloneNode(true) as SVGElement;
+      clone.setAttribute("width", String(width));
+      clone.setAttribute("height", String(height));
+  
+      const svgString = serializer.serializeToString(clone);
+      const svgBlob = new Blob([svgString], {
+        type: "image/svg+xml;charset=utf-8",
+      });
+  
+      const url = URL.createObjectURL(svgBlob);
+      const img = new Image();
+  
+      const capturedOffsetY = offsetY;
+  
+      img.onload = () => {
+        ctx.drawImage(img, 0, capturedOffsetY, width, height);
+        URL.revokeObjectURL(url);
+  
+        pending--;
+        if (pending === 0) {
+          canvas.toBlob((blob) => {
+            if (!blob) return;
+  
+            const pngUrl = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = pngUrl;
+            a.download = "tab.png";
+  
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+  
+            URL.revokeObjectURL(pngUrl);
+          }, "image/png");
+        }
+      };
+  
+      img.src = url;
+      offsetY += height;
+    });
   };
 
   useEffect(() => {
@@ -202,22 +311,22 @@ export default function AlphaTabViewer({
 
           {/* ✅ NEW: Download button at bottom */}
           <div style={{ marginTop: 'auto', padding: '0.5rem' }}>
-            <button
-              onClick={downloadCurrentFile}
-              style={{
-                width: '100%',
-                padding: '0.6rem',
-                borderRadius: '6px',
-                border: 'none',
-                cursor: 'pointer',
-                background: currentConvertedFile ? '#F56960' : '#444',
-                color: 'white',
-                opacity: currentConvertedFile ? 1 : 0.5
-              }}
-              disabled={!currentConvertedFile}
-            >
-              Download Tab
-            </button>
+          <button
+            onClick={() => setShowDownloadModal(true)}
+            style={{
+              width: '100%',
+              padding: '0.6rem',
+              borderRadius: '6px',
+              border: 'none',
+              cursor: 'pointer',
+              background: currentConvertedFile ? '#F56960' : '#444',
+              color: 'white',
+              opacity: currentConvertedFile ? 1 : 0.5
+            }}
+            disabled={!currentConvertedFile}
+          >
+            Download Tab
+          </button>
           </div>
         </div>
 
@@ -243,6 +352,56 @@ export default function AlphaTabViewer({
           isFullscreen={isFullscreen}
         />
       </div>
+      {showDownloadModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999
+          }}
+          onClick={() => setShowDownloadModal(false)}
+        >
+          <div
+            style={{
+              background: "white",
+              padding: "20px",
+              borderRadius: "10px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "10px",
+              minWidth: "200px"
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ margin: 0 }}>Download as</h3>
+
+            <button onClick={() => {
+              downloadMusicXML();
+              setShowDownloadModal(false);
+            }}>
+              MusicXML
+            </button>
+
+            <button onClick={() => {
+              downloadPNG();
+              setShowDownloadModal(false);
+            }}>
+              PNG Image
+            </button>
+
+            <button onClick={() => setShowDownloadModal(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
