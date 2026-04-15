@@ -49,6 +49,26 @@ function Home() {
   );
 }
 
+const theme = createTheme({
+  defaultRadius: 'md',
+  fontFamily: 'Inter, sans-serif',
+  components: {
+    Button: Button.extend({
+      defaultProps: {
+        variant: 'gradient',
+        gradient: { from: '#F56960', to: '#ff8a75', deg: 135 },
+      },
+      styles: {
+        root: {
+          boxShadow: '0 4px 12px rgba(245, 105, 96, 0.25)',
+          transition: 'all 0.25s ease'
+        }
+      }
+    })
+  }
+});
+
+
 export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -77,21 +97,6 @@ export default function App() {
 }
 
 
-const theme = createTheme({
-  defaultRadius: 'md',
-  fontFamily: 'Inter, sans-serif',
-  components: {
-    Button: Button.extend({
-      defaultProps: {
-        variant: 'gradient',
-        gradient: { from: '#F56960', to: '#ff8a75', deg: 135 },
-      },
-      styles: {
-        root: {
-          boxShadow: '0 4px 12px rgba(245, 105, 96, 0.25)',
-          transition: 'all 0.25s ease'
-        }
-      }
-    })
-  }
-})
+
+
+
