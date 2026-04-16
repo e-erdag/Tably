@@ -296,11 +296,11 @@ export default function AlphaTabViewer({
             onClick={(e) => e.stopPropagation()}
           >
             <h3 style={{ margin: 0 }}>Download as</h3>
-            <button onClick={() => { downloadMusicXML(); setShowDownloadModal(false); }}>
-              MusicXML
-            </button>
             <button onClick={() => { downloadPDF(); setShowDownloadModal(false); }}>
               PDF Document
+            </button>
+            <button onClick={() => { downloadMusicXML(); setShowDownloadModal(false); }}>
+              Music XML
             </button>
             <button onClick={() => setShowDownloadModal(false)}>
               Cancel
