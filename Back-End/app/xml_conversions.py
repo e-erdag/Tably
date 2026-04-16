@@ -3,15 +3,27 @@ import subprocess
 from pathlib import Path
 from .tab_convert import get_musicxml_tab
 import xml.etree.ElementTree as ET
-
-MUSESCORE_PATH = os.getenv("MUSESCORE_PATH", "/Applications/MuseScore 4.app/Contents/MacOS/mscore")
-if not os.path.exists(MUSESCORE_PATH):
-    MUSESCORE_PATH = 'musescore'
+from .config import settings
     
 def convert_mscz_to_musicxml_file(mscz_path: str) -> tuple[str, bytes]:
-    musicxml_path = str(Path(mscz_path).with_suffix(".musicxml"))
+    musicxml_path = str(Path(mscz_path).with_suffix(".musicxml")) 
     
-    subprocess.run([MUSESCORE_PATH, mscz_path, "-o", musicxml_path], check=True)
+    cmd = []
+    if settings.musescore_wrapper:
+        cmd.extend(settings.musescore_wrapper.split())
+    cmd.extend([settings.musescore_path, mscz_path, "-o", musicxml_path])
+    
+    result = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Exit {result.returncode}\n"
+            f"STDOUT: {result.stdout}\n"
+            f"STDERR: {result.stderr}"
+        )
 
     if not os.path.exists(musicxml_path):
         raise FileNotFoundError("MuseScore finished without producing a MusicXML file.")
