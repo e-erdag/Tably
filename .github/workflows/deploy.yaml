@@ -1,0 +1,58 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Build frontend
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: Front-End/package-lock.json
+
+      - name: Install and build frontend
+        working-directory: Front-End
+        run: |
+          npm ci
+          npm run build
+
+      # Set up SSH
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DROPLET_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.DROPLET_HOST }} >> ~/.ssh/known_hosts
+
+      # Deploy frontend
+      - name: Sync frontend dist
+        run: |
+          rsync -avz --delete \
+            Front-End/dist/ \
+            ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/var/www/frontend/
+
+      # Deploy backend
+      - name: Sync backend
+        run: |
+          rsync -avz --delete \
+            --exclude '.venv' --exclude '__pycache__' --exclude '.env' \
+            Back-End/ \
+            ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }}:/opt/backend/
+
+      - name: Install backend deps and restart
+        run: |
+          ssh ${{ secrets.DROPLET_USER }}@${{ secrets.DROPLET_HOST }} << 'EOF'
+            set -e
+            cd /opt/backend
+            export PATH="$HOME/.local/bin:$PATH"
+            uv sync --frozen
+            sudo /bin/systemctl restart backend
+          EOF

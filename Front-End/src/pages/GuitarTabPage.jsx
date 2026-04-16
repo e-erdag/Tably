@@ -32,7 +32,7 @@ function GuitarTabPage() {
       const formData = new FormData();
       formData.append("file", newFile);
 
-      const response = await fetch("http://localhost:8000/convert", {
+      const response = await fetch("/api/convert", {
         method: "POST",
         body: formData,
       });
