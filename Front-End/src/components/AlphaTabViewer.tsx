@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { TabRhythmMode, AlphaTabApi } from '@coderline/alphatab';
+import { jsPDF } from 'jspdf';
 import '../styles/AlphaTabViewer2.css';
 import AlphaTabControls from "./AlphaTabControls";
 
@@ -155,79 +156,134 @@ export default function AlphaTabViewer({
     URL.revokeObjectURL(url);
   };
 
-  const downloadPNG = async () => {
-    const viewport = viewportRef.current;
-    const container = mainRef.current;
-    if (!viewport || !container) return;
+  const waitForRender = (renderApi: AlphaTabApi) =>
+    new Promise<void>((resolve) => {
+      const unsubscribe = renderApi.renderFinished.on(() => {
+        unsubscribe();
+        resolve();
+      });
+    });
 
-    // Scroll through to force full render
-    const totalScroll = viewport.scrollHeight;
-    const step = viewport.clientHeight;
-    for (let y = 0; y < totalScroll; y += step) {
-      viewport.scrollTop = y;
-      await new Promise((r) => setTimeout(r, 100));
+  const renderExportSvgs = async () => {
+    const exportHost = document.createElement("div");
+    exportHost.style.position = "fixed";
+    exportHost.style.left = "-10000px";
+    exportHost.style.top = "0";
+    exportHost.style.width = `${Math.max(mainRef.current?.clientWidth ?? 0, 1200)}px`;
+    exportHost.style.background = "#ffffff";
+    exportHost.style.padding = "24px";
+    exportHost.style.overflow = "visible";
+    exportHost.style.zIndex = "-1";
+
+    const exportMain = document.createElement("div");
+    exportMain.style.background = "#ffffff";
+    exportMain.style.overflow = "visible";
+    exportHost.appendChild(exportMain);
+    document.body.appendChild(exportHost);
+
+    const exportApi = new AlphaTabApi(exportMain, {
+      notation: {
+        rhythmMode: TabRhythmMode.Hidden,
+      },
+      core: {
+        fontDirectory: "/font/",
+      },
+      player: {
+        enablePlayer: false,
+        enableCursor: false,
+        enableUserInteraction: false,
+      },
+    });
+
+    try {
+      const renderPromise = waitForRender(exportApi);
+      const buffer = await file.arrayBuffer();
+      exportApi.load(buffer);
+      await renderPromise;
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      return Array.from(
+        exportMain.querySelectorAll<SVGGraphicsElement>("svg"),
+      );
+    } finally {
+      exportApi.destroy();
+      document.body.removeChild(exportHost);
     }
-    viewport.scrollTop = 0;
-    await new Promise((r) => setTimeout(r, 100));
+  };
 
-    const svgs = Array.from(container.querySelectorAll("svg"));
+  const svgToPageImage = async (svg: SVGGraphicsElement) => {
+    const bbox = svg.getBBox();
+    const padding = 24;
+    const width = Math.max(1, Math.ceil(bbox.width + padding * 2));
+    const height = Math.max(1, Math.ceil(bbox.height + padding * 2));
+
+    const clone = svg.cloneNode(true) as SVGGraphicsElement;
+    clone.setAttribute(
+      "viewBox",
+      `${bbox.x - padding} ${bbox.y - padding} ${bbox.width + padding * 2} ${bbox.height + padding * 2}`,
+    );
+    clone.setAttribute("width", String(width));
+    clone.setAttribute("height", String(height));
+    clone.setAttribute("preserveAspectRatio", "xMinYMin meet");
+
+    const svgString = new XMLSerializer().serializeToString(clone);
+    const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(svgBlob);
+
+    try {
+      return await new Promise<{ imageData: string; width: number; height: number }>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            reject(new Error("Canvas context unavailable"));
+            return;
+          }
+
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve({
+            imageData: canvas.toDataURL("image/png"),
+            width,
+            height,
+          });
+        };
+        img.onerror = reject;
+        img.src = url;
+      });
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  const downloadPDF = async () => {
+    const svgs = await renderExportSvgs();
     if (svgs.length === 0) return;
 
-    const sizes = svgs.map((svg) => ({
-      svg,
-      width: svg.viewBox.baseVal.width || svg.clientWidth,
-      height: svg.viewBox.baseVal.height || svg.clientHeight,
-    }));
+    const pages = await Promise.all(svgs.map(svgToPageImage));
 
-    const totalWidth = Math.max(...sizes.map(s => s.width));
-    const totalHeight = sizes.reduce((sum, s) => sum + s.height, 0);
-
-    const canvas = document.createElement("canvas");
-    canvas.width = totalWidth;
-    canvas.height = totalHeight;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, totalWidth, totalHeight);
-
-    let offsetY = 0;
-    let pending = sizes.length;
-
-    sizes.forEach(({ svg, width, height }) => {
-      const clone = svg.cloneNode(true) as SVGElement;
-      clone.setAttribute("width", String(width));
-      clone.setAttribute("height", String(height));
-
-      const svgString = new XMLSerializer().serializeToString(clone);
-      const svgBlob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
-      const url = URL.createObjectURL(svgBlob);
-      const img = new Image();
-      const capturedOffsetY = offsetY;
-
-      img.onload = () => {
-        ctx.drawImage(img, 0, capturedOffsetY, width, height);
-        URL.revokeObjectURL(url);
-        pending--;
-        if (pending === 0) {
-          canvas.toBlob((blob) => {
-            if (!blob) return;
-            const pngUrl = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = pngUrl;
-            a.download = "tab.png";
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(pngUrl);
-          }, "image/png");
-        }
-      };
-
-      img.src = url;
-      offsetY += height;
+    const firstPage = pages[0];
+    const pdf = new jsPDF({
+      orientation: firstPage.width >= firstPage.height ? "landscape" : "portrait",
+      unit: "pt",
+      format: [firstPage.width, firstPage.height],
     });
+
+    pages.forEach((page, index) => {
+      if (index > 0) {
+        pdf.addPage(
+          [page.width, page.height],
+          page.width >= page.height ? "landscape" : "portrait",
+        );
+      }
+      pdf.addImage(page.imageData, "PNG", 0, 0, page.width, page.height);
+    });
+
+    pdf.save("tab.pdf");
   };
 
   const isConverting = convertingIndices?.includes(currentIndex) ?? false;
@@ -355,8 +411,8 @@ export default function AlphaTabViewer({
             <button onClick={() => { downloadMusicXML(); setShowDownloadModal(false); }}>
               MusicXML
             </button>
-            <button onClick={() => { downloadPNG(); setShowDownloadModal(false); }}>
-              PNG Image
+            <button onClick={() => { downloadPDF(); setShowDownloadModal(false); }}>
+              PDF Document
             </button>
             <button onClick={() => setShowDownloadModal(false)}>
               Cancel
