@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { TabRhythmMode, AlphaTabApi } from '@coderline/alphatab';
-import { jsPDF } from 'jspdf';
-import html2canvas from 'html2canvas';
 import '../styles/AlphaTabViewer2.css';
 import AlphaTabControls from "./AlphaTabControls";
 
@@ -157,233 +155,22 @@ export default function AlphaTabViewer({
     URL.revokeObjectURL(url);
   };
 
-  const waitForRender = (renderApi: AlphaTabApi) =>
-    new Promise<void>((resolve) => {
-      const unsubscribe = renderApi.renderFinished.on(() => {
-        unsubscribe();
-        resolve();
-      });
-    });
+  const downloadPDF = () => {
+    if (!api) return;
 
-  const waitForRenderOrTimeout = async (renderApi: AlphaTabApi, timeoutMs = 2000) => {
-    await Promise.race([
-      waitForRender(renderApi),
-      new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
-    ]);
-  };
-
-  const waitForFonts = async () => {
-    if ("fonts" in document) {
-      await document.fonts.ready;
-    }
-  };
-
-  const renderExportDocument = async () => {
-    await waitForFonts();
-    const exportHost = document.createElement("div");
-    exportHost.style.position = "fixed";
-    exportHost.style.left = "-10000px";
-    exportHost.style.top = "0";
-    exportHost.style.width = "1122px";
-    exportHost.style.background = "#ffffff";
-    exportHost.style.padding = "24px";
-    exportHost.style.overflow = "visible";
-    exportHost.style.zIndex = "-1";
-
-    const exportMain = document.createElement("div");
-    exportMain.style.background = "#ffffff";
-    exportMain.style.overflow = "visible";
-    exportHost.appendChild(exportMain);
-    document.body.appendChild(exportHost);
-
-    const exportApi = new AlphaTabApi(exportMain, {
-      core: {
-        fontDirectory: "/font/",
-        enableLazyLoading: false,
-      },
-      display: {
-        scale: 0.8,
-        stretchForce: 0.8,
-      },
-      notation: {
-        rhythmMode: TabRhythmMode.Hidden,
-      },
-      player: {
-        enablePlayer: false,
-        enableCursor: false,
-        enableUserInteraction: false,
-      },
-    });
-
-    const cleanup = () => {
-      exportApi.destroy();
-      document.body.removeChild(exportHost);
-    };
-
-    const renderPromise = waitForRender(exportApi);
-    const buffer = await file.arrayBuffer();
-    exportApi.load(buffer);
-    await renderPromise;
-    await waitForRenderOrTimeout(exportApi, 2500);
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    await waitForFonts();
-
-    return {
-      exportMain,
-      cleanup,
-    };
-  };
-
-  const cropCanvasToContent = (sourceCanvas: HTMLCanvasElement) => {
-    const ctx = sourceCanvas.getContext("2d");
-    if (!ctx) {
-      return sourceCanvas;
-    }
-
-    const { width, height } = sourceCanvas;
-    const imageData = ctx.getImageData(0, 0, width, height).data;
-    let minX = width;
-    let minY = height;
-    let maxX = -1;
-    let maxY = -1;
-
-    for (let y = 0; y < height; y += 1) {
-      for (let x = 0; x < width; x += 1) {
-        const index = (y * width + x) * 4;
-        const r = imageData[index];
-        const g = imageData[index + 1];
-        const b = imageData[index + 2];
-        const a = imageData[index + 3];
-        const isContent = a > 0 && (r < 245 || g < 245 || b < 245);
-        if (!isContent) continue;
-
-        minX = Math.min(minX, x);
-        minY = Math.min(minY, y);
-        maxX = Math.max(maxX, x);
-        maxY = Math.max(maxY, y);
-      }
-    }
-
-    if (maxX < minX || maxY < minY) {
-      return sourceCanvas;
-    }
-
-    const padding = 24;
-    const cropX = Math.max(0, minX - padding);
-    const cropY = Math.max(0, minY - padding);
-    const cropWidth = Math.min(width - cropX, maxX - minX + padding * 2);
-    const cropHeight = Math.min(height - cropY, maxY - minY + padding * 2);
-
-    const croppedCanvas = document.createElement("canvas");
-    croppedCanvas.width = cropWidth;
-    croppedCanvas.height = cropHeight;
-    const croppedCtx = croppedCanvas.getContext("2d");
-    if (!croppedCtx) {
-      return sourceCanvas;
-    }
-
-    croppedCtx.fillStyle = "#ffffff";
-    croppedCtx.fillRect(0, 0, cropWidth, cropHeight);
-    croppedCtx.drawImage(
-      sourceCanvas,
-      cropX,
-      cropY,
-      cropWidth,
-      cropHeight,
-      0,
-      0,
-      cropWidth,
-      cropHeight,
-    );
-
-    return croppedCanvas;
-  };
-
-  const downloadPDF = async () => {
     try {
-      const { exportMain, cleanup } = await renderExportDocument();
-      try {
-        if (!exportMain.querySelector("svg, canvas")) {
-          throw new Error("No rendered tablature pages were found for export.");
-        }
-
-        const capturedCanvas = await html2canvas(exportMain, {
-          backgroundColor: "#ffffff",
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          width: exportMain.scrollWidth,
-          height: exportMain.scrollHeight,
-          windowWidth: exportMain.scrollWidth,
-          windowHeight: exportMain.scrollHeight,
-        });
-        const canvas = cropCanvasToContent(capturedCanvas);
-
-        const pdf = new jsPDF({
-          orientation: "portrait",
-          unit: "pt",
-          format: "a4",
-        });
-
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
-        const margin = 24;
-        const usableWidth = pageWidth - margin * 2;
-        const usableHeight = pageHeight - margin * 2;
-        const scale = usableWidth / canvas.width;
-        const sliceHeightPx = Math.max(1, Math.floor(usableHeight / scale));
-
-        let offsetY = 0;
-        let pageIndex = 0;
-
-        while (offsetY < canvas.height) {
-          const currentSliceHeight = Math.min(sliceHeightPx, canvas.height - offsetY);
-          const pageCanvas = document.createElement("canvas");
-          pageCanvas.width = canvas.width;
-          pageCanvas.height = currentSliceHeight;
-
-          const ctx = pageCanvas.getContext("2d");
-          if (!ctx) {
-            throw new Error("Canvas context unavailable");
-          }
-
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
-          ctx.drawImage(
-            canvas,
-            0,
-            offsetY,
-            canvas.width,
-            currentSliceHeight,
-            0,
-            0,
-            canvas.width,
-            currentSliceHeight,
-          );
-
-          const imageData = pageCanvas.toDataURL("image/png");
-          const renderedHeight = currentSliceHeight * scale;
-
-          if (pageIndex > 0) {
-            pdf.addPage(
-              "a4",
-              "portrait",
-            );
-          }
-
-          pdf.addImage(imageData, "PNG", margin, margin, usableWidth, renderedHeight);
-
-          offsetY += currentSliceHeight;
-          pageIndex += 1;
-        }
-
-        pdf.save("tab.pdf");
-      } finally {
-        cleanup();
-      }
+      api.print(undefined, {
+        core: {
+          enableLazyLoading: false,
+        },
+        display: {
+          scale: 0.8,
+          stretchForce: 0.8,
+        },
+      });
     } catch (error) {
-      console.error("PDF export failed", error);
-      window.alert("PDF export failed. Please open the browser console and send me the error.");
+      console.error("Print/PDF export failed", error);
+      window.alert("Print/PDF export failed. Please try again and check the browser console.");
     }
   };
 
