@@ -9,6 +9,8 @@ from music21 import (
     chord,
     spanner,
     bar,
+    expressions,
+    converter
 )
 import copy
 import xml.etree.ElementTree as ET
@@ -90,18 +92,12 @@ def build_measure(
     pitch_shift: int,
     string_frets: list[StringFret],
     sf_idx: int,
-    chord_indices: list[int],
-    note_idx: int,
     score_info: ScoreInfo,
     use_upper_staff_only: bool,
     prev_fret: int = 0,
     open_streak: int = 0,
-) -> tuple[stream.Measure, int, int, int, int]:
-    """Build a new tab measure from an old measure.
-    
-    Returns:
-        (measure, updated sf_idx, updated note_idx)
-    """
+) -> tuple[stream.Measure, int, int, int]:
+    """Build a new tab measure from an old measure."""
     measure = stream.Measure(number=i + 1)
 
     if i == 0:
@@ -113,7 +109,6 @@ def build_measure(
         quarter_bpm = mm.getQuarterBPM()
         new_mm = tempo.MetronomeMark(number=quarter_bpm)
         measure.insert(0, new_mm)
-
     
     for ele in old_measure.recurse():
         if not should_keep_element(ele, use_upper_staff_only):
@@ -124,6 +119,7 @@ def build_measure(
                 measure.leftBarline = ele
             else:
                 measure.rightBarline = ele
+                
         elif isinstance(ele, chord.Chord):
             # Use the viterbi-assigned position for the highest note
             #  of this chord
@@ -155,24 +151,15 @@ def build_measure(
             assignments = assign_chord_strings(shifted_notes, anchor_fret=anchor_fret)
 
             for n_i, (n, sf) in enumerate(assignments):
-                # if i+1 in range(28, 34):
-                #     print(f"  measure={i+1} n_i={n_i}, pitch={n.pitch}, string={sf.string}, fret={sf.fret}, offset={ele.offset}")
-
                 n.articulations.append(articulations.StringIndication(sf.string))
                 n.articulations.append(articulations.FretIndication(sf.fret))
-
+                n.style.absoluteX = int(ele.offset * 10000)
                 # Preserve the offset between notes in a chord
                 # For example, if offset = 0 for the first note, offset = 0
                 #  for every other note in the chord.
                 # This helps alphatab render the chord properly
                 measure.insert(ele.offset, n)
 
-                # Mark chord members (not the first note) for 
-                # post-processing <chord/> injection
-                if n_i > 0:
-                    chord_indices.append(note_idx)
-
-                note_idx += 1
             
             fretted = [sf.fret for _, sf in assignments if sf.fret > 0]
             if fretted:
@@ -191,9 +178,8 @@ def build_measure(
 
             ele.articulations.append(articulations.StringIndication(sf.string))
             ele.articulations.append(articulations.FretIndication(sf.fret))
-
+            ele.style.absoluteX = int(ele.offset * 10000)
             measure.append(ele)
-            note_idx += 1
             
             if sf.fret > 0:
                 prev_fret = sf.fret
@@ -210,23 +196,66 @@ def build_measure(
             # Deep copy rests to avoid music21 stream ownership issues
             n = copy.deepcopy(ele)
             measure.append(n)
+            
+    return measure, sf_idx, prev_fret, open_streak
 
-            # Increment note_idx for rests because MusicXML <note> 
-            # elements include rests, so chord_indices must account for them
-            note_idx += 1
+# def describe(n: ET.Element, root) -> str:
+#     # rest?
+#     if n.find('rest') is not None:
+#         return f'REST dur={n.findtext("duration")}'
+#     # pitch
+#     step = n.findtext('pitch/step')
+#     octave = n.findtext('pitch/octave')
+#     alter = n.findtext('pitch/alter') or ''
+#     alter_sym = {'1': '#', '-1': 'b', '2': '##', '-2': 'bb'}.get(alter, '')
+#     pitch = f'{step}{alter_sym}{octave}' if step else '?'
+#     # duration & voice
+#     dur = n.findtext('duration')
+#     voice = n.findtext('voice')
+#     # is it already a chord member?
+#     is_chord = n.find('chord') is not None
+#     # tab articulations (your pipeline adds these)
+#     string = n.findtext('.//string')
+#     fret = n.findtext('.//fret')
+#     # find parent measure
+#     parent_measure = None
+#     for m in root.iter('measure'):
+#         if n in list(m):
+#             parent_measure = m.get('number')
+#             break
+#     return (f'm{parent_measure} {pitch:>5} dur={dur} v={voice} '
+#             f'str={string} fret={fret}{" [chord]" if is_chord else ""}')
 
-    return measure, sf_idx, note_idx, prev_fret, open_streak
-
-def inject_chords(tree: ET.ElementTree, chord_indices: list[int]) -> ET.ElementTree:
+def inject_chords(tree: ET.ElementTree) -> ET.ElementTree:
     root = tree.getroot()
     assert root is not None
-    all_notes = root.findall('.//note')
-    
-    for i in chord_indices:
-        if i >= len(all_notes):
-            continue
-        n = all_notes[i]
-        n.insert(0, ET.Element('chord'))
+ 
+    for measure in root.findall('.//measure'):
+        prev_x = None
+        prev_grace = None
+        for n in measure.findall('note'):
+            if n.find('rest') is not None:
+                prev_x = None
+                prev_grace = None
+                continue
+ 
+            dx = n.get('default-x')
+            if dx is None:
+                prev_x = None
+                prev_grace = None
+                continue
+ 
+            is_grace = n.find('grace') is not None
+
+            if is_grace != prev_grace:
+                prev_x = None
+ 
+            if dx == prev_x:
+                n.insert(0, ET.Element('chord'))
+ 
+            prev_x = dx
+            prev_grace = is_grace
+ 
     return ET.ElementTree(root)
 
 
@@ -244,28 +273,24 @@ def get_musicxml_tab(xml_path: Path | str):
 
     tab, part = build_tab_score(score_info)
     
-    chord_indices: list[int] = []
     sf_idx = 0
-    note_idx = 0
     prev_fret = 0
     open_streak = 0
     for i, old_measure in enumerate(old_measures):
-        measure, sf_idx, note_idx, prev_fret, open_streak = build_measure(
+        measure, sf_idx, prev_fret, open_streak = build_measure(
             i, 
             old_measure, 
             pitch_shift,
             string_frets, 
             sf_idx,
-            chord_indices, 
-            note_idx,
             score_info, 
             use_upper_staff,
             prev_fret,
             open_streak
         )
-        part.append(measure)
+        part.append(measure)  
     
     tab.append(part)
     tree = add_staff_details(tab)
-    tree = inject_chords(tree, chord_indices)
+    tree = inject_chords(tree)    
     return tree

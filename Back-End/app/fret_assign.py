@@ -84,7 +84,7 @@ def note_cost(prev: StringFret, curr: StringFret) -> float:
         
     open = -8 if curr.fret == 0 else 0
     
-    pos_cost = curr.fret * 2
+    pos_cost = 1.2 ** curr.fret
     
     return fret_cost  + pos_cost + open
 
