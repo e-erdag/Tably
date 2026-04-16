@@ -1,11 +1,13 @@
 import { useState, Dispatch, SetStateAction } from "react";
 import { AlphaTabApi } from "@coderline/alphatab";
-import { Button, Group, Popover, SimpleGrid, Stack } from "@mantine/core";
-import { IconMetronome, IconPlayerPauseFilled, IconPlayerPlayFilled, IconPlayerSkipBackFilled } from '@tabler/icons-react'
+import { Button, Group, Popover, Slider, Stack, Text } from "@mantine/core";
+import { IconMetronome, IconPlayerPauseFilled, IconPlayerPlayFilled, IconPlayerSkipBackFilled, IconVolume } from '@tabler/icons-react'
 
 interface AlphaTabControlsProps {
 	api?: AlphaTabApi; //api instance
   isPlaying: boolean; // Whether the score is playing
+  volume: number;
+  setVolume: Dispatch<SetStateAction<number>>;
   metronomeOn: boolean;
   setMetronomeOn: any;
 	tracks: any[]; //list of tracks available
@@ -20,6 +22,8 @@ interface AlphaTabControlsProps {
 export default function AlphaTabControls({
 	api,
   isPlaying,
+  volume,
+  setVolume,
   metronomeOn,
   setMetronomeOn,
   onFullscreen
@@ -55,19 +59,10 @@ export default function AlphaTabControls({
     setMetronomeOn(!metronomeOn);
   };
 
-  const instruments = [
-    { name: "Piano", program: 0 },
-    { name: "Acoustic Guitar", program: 24 },
-    { name: "Bass", program: 32 },
-    { name: "Drums", program: 115 },
-  ];
-
-  const getIconFromProgram = (program: number) => {
-    if ([24, 25, 26, 27, 28].includes(program)) return "🎸";
-    if (program === 0) return "🎹";
-    if ([32, 33].includes(program)) return "🎸";
-    if (program === 115) return "🥁";
-    return "🎵";
+  const changeVolume = (newVolume: number) => {
+    setVolume(newVolume);
+    if (!api) return;
+    api.masterVolume = newVolume;
   };
 
 	const speeds = [0.25, 0.5, 0.75, 1, 1.5, 1.75, 2];
@@ -134,6 +129,24 @@ export default function AlphaTabControls({
 				>
 					<IconMetronome />
 				</Button>
+        <Group gap="xs" wrap="nowrap" w={160}>
+          <IconVolume size={18} color="#fff" />
+          <Slider
+            min={0}
+            max={3}
+            step={0.1}
+            value={volume}
+            onChange={changeVolume}
+            color="red.5"
+            label={(value) => `${Math.round(value * 100)}%`}
+            styles={{
+              root: { flex: 1 },
+            }}
+          />
+          <Text c="white" size="sm" w={36}>
+            {Math.round(volume * 100)}%
+          </Text>
+        </Group>
       </Group>
 
       <Group justify="flex-end">

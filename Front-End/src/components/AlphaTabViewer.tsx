@@ -35,6 +35,7 @@ export default function AlphaTabViewer({
   const [metronomeOn, setMetronomeOn] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
+  const [volume, setVolume] = useState(1.5);
 
   useEffect(() => {
     if (getSvg) {
@@ -61,6 +62,8 @@ export default function AlphaTabViewer({
         scrollElement: viewportRef.current,
       },
     });
+
+    alphaApi.masterVolume = volume;
 
     setApi(alphaApi);
 
@@ -111,6 +114,11 @@ export default function AlphaTabViewer({
       alphaApi.destroy();
     };
   }, [file]);
+
+  useEffect(() => {
+    if (!api) return;
+    api.masterVolume = volume;
+  }, [api, volume]);
 
   useEffect(() => {
     const handleFullscreenChange = async () => {
@@ -257,6 +265,8 @@ export default function AlphaTabViewer({
         trackPrograms={trackPrograms}
         setTrackPrograms={setTrackPrograms}
         isPlaying={isPlaying}
+        volume={volume}
+        setVolume={setVolume}
         metronomeOn={metronomeOn}
         setMetronomeOn={setMetronomeOn}
         reloadFile={async () => {
