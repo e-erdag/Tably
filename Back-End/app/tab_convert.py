@@ -7,6 +7,8 @@ from music21 import (
     tempo,
     instrument,
     chord,
+    spanner,
+    bar,
 )
 import copy
 import xml.etree.ElementTree as ET
@@ -112,11 +114,17 @@ def build_measure(
         new_mm = tempo.MetronomeMark(number=quarter_bpm)
         measure.insert(0, new_mm)
 
-    for ele in old_measure.recurse().notesAndRests:
+    
+    for ele in old_measure.recurse():
         if not should_keep_element(ele, use_upper_staff_only):
             continue
 
-        if isinstance(ele, chord.Chord):
+        if isinstance(ele, bar.Repeat):
+            if ele.direction == 'start':
+                measure.leftBarline = ele
+            else:
+                measure.rightBarline = ele
+        elif isinstance(ele, chord.Chord):
             # Use the viterbi-assigned position for the highest note
             #  of this chord
             if sf_idx < len(string_frets):
@@ -127,8 +135,9 @@ def build_measure(
             
             shifted_notes = []
             for n in ele.notes:
-                shifted = note.Note(n.pitch.midi + pitch_shift, quarterLength=ele.quarterLength)
-                shifted_notes.append(shifted)
+                n.transpose(pitch_shift, inPlace=True)
+                # shifted = note.Note(n.pitch.midi + pitch_shift, quarterLength=ele.quarterLength)
+                shifted_notes.append(n)
             
             anchor_fret = sf.fret if sf.fret > 0 else prev_fret
             if anchor_fret == 0:
@@ -170,16 +179,6 @@ def build_measure(
                 open_streak = 0
                 # Set previous fret to be the average of the fretted notes only
                 prev_fret = round(sum(fretted) / len(fretted))
-        
-
-            # sf = string_frets[sf_idx]
-            
-            # ele.notes[-1].articulations.append(articulations.StringIndication(sf.string))
-            # ele.notes[-1].articulations.append(articulations.FretIndication(sf.fret))
-            
-            # measure.append(ele.notes[-1])
-            
-            # sf_idx += 1
 
 
         elif isinstance(ele, note.Note):
@@ -217,7 +216,6 @@ def build_measure(
             note_idx += 1
 
     return measure, sf_idx, note_idx, prev_fret, open_streak
-
 
 def inject_chords(tree: ET.ElementTree, chord_indices: list[int]) -> ET.ElementTree:
     root = tree.getroot()
