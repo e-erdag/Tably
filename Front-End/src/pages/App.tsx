@@ -7,12 +7,27 @@ import GuitarTabPage from "./GuitarTabPage";
 import { Button, createTheme, MantineProvider } from '@mantine/core';
 import '@mantine/core/styles.css'
 
-function Home() {
+function Home({ savedFiles, savedConvertedFiles, onSaveFiles, onSaveConvertedFiles }: {
+  savedFiles: File[];
+  savedConvertedFiles: File[];
+  onSaveFiles: (files: File[]) => void;
+  onSaveConvertedFiles: (files: File[]) => void;
+}) {
   const navigate = useNavigate();
 
   const handleFile = async (converted: { blob: Blob, name: string }) => {
     const file = new File([converted.blob], converted.name);
-    navigate("/tab", { state: { file } });
+
+    if (savedFiles.length > 0) {
+
+      onSaveFiles([...savedFiles, file]);
+      onSaveConvertedFiles([...savedConvertedFiles, file]);
+    } else {
+      onSaveFiles([file]);
+      onSaveConvertedFiles([file]);
+    }
+
+    navigate("/tab");  
   };
 
   return (
@@ -73,7 +88,11 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const [savedFiles, setSavedFiles] = useState<File[]>([]);
+  const [savedConvertedFiles, setSavedConvertedFiles] = useState<File[]>([]);
+
   const isTabPage = location.pathname === "/tab";
+  const hasSavedFiles = savedFiles.length > 0;
 
   return (
     <MantineProvider theme={theme}>
@@ -86,11 +105,30 @@ export default function App() {
             Return
           </button>
         )}
+
+        {/* return to tabs button */}
+        {!isTabPage && hasSavedFiles && (
+          <button className="return-btn" onClick={() => navigate("/tab")}>
+            Back to Tabs
+          </button>
+        )}
       </header>
 
       <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/tab" element={<GuitarTabPage />} />
+        <Route path="/" element={
+          <Home
+            savedFiles={savedFiles}
+            savedConvertedFiles={savedConvertedFiles}
+            onSaveFiles={setSavedFiles}
+            onSaveConvertedFiles={setSavedConvertedFiles}
+          />} />
+        <Route path="/tab" element={<GuitarTabPage 
+            savedFiles={savedFiles}
+            savedConvertedFiles={savedConvertedFiles}
+            onSaveFiles={setSavedFiles}
+            onSaveConvertedFiles={setSavedConvertedFiles}
+          />} 
+        />
       </Routes>
     </MantineProvider>
   );

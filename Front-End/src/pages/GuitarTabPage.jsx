@@ -1,18 +1,27 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Navigate, useLocation, useNavigate } from "react-router-dom"; 
 import '../styles/GuitarTabPage.css';
 import AlphaTabViewer from '../components/AlphaTabViewer';
 
-function GuitarTabPage() {
+function GuitarTabPage({ savedFiles, savedConvertedFiles, onSaveFiles, onSaveConvertedFiles }) {
   const location = useLocation();
   const navigate = useNavigate();
 
   const initialFile = location.state?.file;
 
-  const [files, setFiles] = useState(initialFile ? [initialFile] : []);
-  const [convertedFiles, setConvertedFiles] = useState(initialFile ? [initialFile] : []);
+  const [files, setFiles] = useState(
+    savedFiles.length > 0 ? savedFiles : (initialFile ? [initialFile] : [])
+  );
+  const [convertedFiles, setConvertedFiles] = useState(
+    savedConvertedFiles.length > 0 ? savedConvertedFiles : (initialFile ? [initialFile] : [])
+  );
   const [currentIndex, setCurrentIndex] = useState(0);
   const [convertingIndices, setConvertingIndices] = useState([]);
+
+  useEffect(() => {
+    onSaveFiles(files);
+    onSaveConvertedFiles(convertedFiles);
+  }, [files, convertedFiles]);
 
   if (files.length === 0) {
     return <Navigate to='/' />;

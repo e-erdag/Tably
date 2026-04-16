@@ -109,6 +109,7 @@ h1, h2, h3 {
 .instruction-box h3 {
   margin: 0 0 0.3rem 0;
   color: var(--color-primary);
+  font-size: 25px;
 }
 
 .instruction-box p {
@@ -159,7 +160,7 @@ h1, h2 {
 
 .tably-header {
   display: flex;
-  justify-content: space-between; /* ✅ pushes title left, button right */
+  justify-content: space-between; 
   align-items: center;
   padding: 16px 24px;
 }
