@@ -14,12 +14,36 @@ from .constants import (
 def shift_pitches_to_range(midi_pitches: list[int]) -> tuple[list[int], int]:
     if not midi_pitches:
         return midi_pitches, 0
-    if max(midi_pitches) > MAX_MIDI_PITCH:
-        return [p - 12 for p in midi_pitches], -12
-    elif min(midi_pitches) < MIN_MIDI_PITCH:
-        return [p + 12 for p in midi_pitches], 12
-    return midi_pitches, 0
-
+    
+    best_shift = 0
+    best_cost = float('inf')
+    
+    for shift in [-24, -12, 0, 12, 24]:
+        cost = 0.0
+        for p in midi_pitches:
+            shifted_p = p + shift
+            if shifted_p < MIN_MIDI_PITCH:
+                cost += (MIN_MIDI_PITCH - shifted_p) * 10
+            elif shifted_p > MAX_MIDI_PITCH:
+                cost += (shifted_p - MAX_MIDI_PITCH) * 10
+            else:
+                lowest_fret = MAX_FRET + 1
+                for open_pitch in OPEN_STRING_PITCHES.values():
+                    fret = shifted_p - open_pitch.midi
+                    if 0 <= fret <= MAX_FRET:
+                        lowest_fret = min(lowest_fret, fret)
+                if lowest_fret <= MAX_FRET:
+                    cost += lowest_fret
+        if cost <  best_cost:
+            best_cost = cost
+            best_shift = shift
+            
+    print("Best Shift:", best_shift)
+    
+    if best_shift == 0:
+        return midi_pitches, 0
+    return [p + best_shift for p in midi_pitches], best_shift
+    
 def get_frets(midi_pitch: int) -> list[StringFret]:
     string_frets = []
     for string, open_pitch in OPEN_STRING_PITCHES.items():
@@ -56,36 +80,50 @@ def note_cost(prev: StringFret, curr: StringFret) -> float:
         fret_dist = 0
     # string_dist = abs(prev.string - curr.string)
 
-    fret_cost = fret_dist * 2 
+    fret_cost = fret_dist * 4
         
     open = -8 if curr.fret == 0 else 0
     
-    pos_cost_base = 1.2   
-    pos_cost = pos_cost_base ** curr.fret
+    pos_cost = curr.fret * 2
     
     return fret_cost  + pos_cost + open
 
-def chord_cost(assignment: list[tuple[note.Note, StringFret]], anchor_fret: int) -> tuple[float, float, float]:
+def chord_cost(assignment: list[tuple[note.Note, StringFret]], anchor_fret: int) -> float:
     # If two string-fret assignments are on the same string, this
     #  cannot be a valid chord
     strings = [sf.string for _, sf in assignment]
     if len(set(strings)) < len(strings):
-        return (float('inf'), float('inf'), float('inf'))
+        return float('inf')
     
     frets = [sf.fret for _, sf in assignment if sf.fret > 0]
     span = (max(frets) - min(frets)) if frets else 0
+
+    if span > MAX_SPREAD:
+        return float('inf')
     
-    def rel_pos(f):
-        if abs(f - anchor_fret) > 5 and f != 0 and anchor_fret != 0:
-            return float('inf')
-        else:
-            return abs(f - anchor_fret)
+    min_fret = min(frets) if frets else 0
+    span_cost = span * max(2, 10 - min_fret)
     
-    abs_post_cost = sum(1.2 ** sf.fret for _, sf in assignment)
-    rel_pos_cost = sum(1.2 ** rel_pos(sf.fret) for _, sf in assignment)
-    open_count = sum(8 for _, sf in assignment if sf.fret == 0)
+    pos_cost = sum(sf.fret * 2 for _, sf in assignment)
+    anchor_cost = 0
+    for _, sf in assignment:
+        if sf.fret > 0 and anchor_fret > 0:
+            dist = abs(sf.fret - anchor_fret)
+            if dist > MAX_SPREAD + 2:
+                return float('inf')
+            anchor_cost += dist * 5 
     
-    return (span, abs_post_cost * 2 + rel_pos_cost, -open_count)
+    # The farther away the hand is from the nut, the less open strings should 
+    #  be counted as a bonus
+    open_bonus = 0
+    for _, sf in assignment:
+        if sf.fret == 0:
+            if anchor_fret <= 4:
+                open_bonus += 8
+            else:
+                open_bonus += max(0, 8 - anchor_fret)
+    
+    return span_cost + pos_cost + anchor_cost - open_bonus
 
 def viterbi(midi_pitches: list[int]) -> list[StringFret]:
     if not midi_pitches: return []
@@ -151,14 +189,23 @@ def assign_chord_strings(chord_notes: list[note.Note], anchor_fret: int = 0):
     # sort low pitch to high pitch
     sorted_notes = sorted(chord_notes, key=lambda n: n.pitch.midi)
 
+    # If the chord is just an octave, simplify to the single note
+    if len(sorted_notes) == 2:
+        interval = abs(sorted_notes[1].pitch.midi - sorted_notes[0].pitch.midi)
+        if interval == 12:
+            # Here, we use the lower note since it works better with 
+            #  the overall algorithm
+            keep = sorted_notes[1]
+            sf = get_closest_string_fret(keep.pitch.midi + PITCH_SHIFT)
+            result = [(copy.deepcopy(keep), sf)]
+            return result
+
     # build candidate strings for each note
     note_candidates: list[tuple[note.Note, list[StringFret]]] = []
     for n in sorted_notes:
         candidates: list[StringFret] = []
         for string_num, open_pitch in OPEN_STRING_PITCHES.items():
             fret = n.pitch.midi - open_pitch.midi + PITCH_SHIFT
-            # if fret > MAX_FRET:
-            #     fret -= 12
             if 0 <= fret <= MAX_FRET:
                 candidates.append(StringFret(string_num, int(fret)))
         if not candidates:
@@ -166,7 +213,7 @@ def assign_chord_strings(chord_notes: list[note.Note], anchor_fret: int = 0):
         note_candidates.append((n, candidates))
 
     best_assignment: list[tuple[note.Note, StringFret]] | None = None
-    best_score: tuple[float, float, float] | None = None
+    best_score: float | None = None
 
     # pick a note, try putting it on a string, move to next note, 
     # if its impossible, go back and try another string

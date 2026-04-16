@@ -96,15 +96,20 @@ def collect_midi_pitches(old_measures, use_upper_staff_only) -> list[int]:
     """Collect MIDI pitches from all measures using recurse() to dig into voices."""
     midi_pitches = []
     for old_measure in old_measures:
-        # Use recurse() to match the second pass in build_measure
         for ele in old_measure.recurse().notesAndRests:
             if not should_keep_element(ele, use_upper_staff_only):
                 continue
             if isinstance(ele, note.Note):
                 midi_pitches.append(ele.pitch.midi)
             elif isinstance(ele, chord.Chord):
-                # get the midi pitch of the highest note, for now
-                midi_pitches.append(ele.notes[-1].pitch.midi)
+                # Use the center of the chord as the note to collect
+                # This will trick viterbi into using the a more sensible fret position
+                #  anchor for the chord, while assign_chord_strings will still voice
+                #  the same chord using the better anchor
+                centroid = round(
+                    sum(n.pitch.midi for n in ele.notes) / len(ele.notes)
+                )
+                midi_pitches.append(centroid)
     return midi_pitches
 
 

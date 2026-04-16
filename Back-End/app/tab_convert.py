@@ -14,6 +14,8 @@ from pathlib import Path
 
 from .constants import (
     E_STANDARD_GUITAR,
+    E_STANDARD_MIDI,
+    MAX_FRET,
     ScoreInfo,
     StringFret,
 )
@@ -90,7 +92,9 @@ def build_measure(
     note_idx: int,
     score_info: ScoreInfo,
     use_upper_staff_only: bool,
-) -> tuple[stream.Measure, int, int]:
+    prev_fret: int = 0,
+    open_streak: int = 0,
+) -> tuple[stream.Measure, int, int, int, int]:
     """Build a new tab measure from an old measure.
     
     Returns:
@@ -119,18 +123,31 @@ def build_measure(
                 sf = string_frets[sf_idx]
                 sf_idx += 1
             else:
-                sf = get_closest_string_fret(ele.notes[0].pitch.midi + pitch_shift)
+                sf = get_closest_string_fret(ele.notes[0].pitch.midi + pitch_shift)                
             
             shifted_notes = []
             for n in ele.notes:
                 shifted = note.Note(n.pitch.midi + pitch_shift, quarterLength=ele.quarterLength)
                 shifted_notes.append(shifted)
             
-            assignments = assign_chord_strings(shifted_notes, anchor_fret=sf.fret)
+            anchor_fret = sf.fret if sf.fret > 0 else prev_fret
+            if anchor_fret == 0:
+                # Try to do what we can to make anchor_fret anything but 0, unless that
+                #  is truly the optimal place for the anchor
+                nonzero_frets = []
+                for n in shifted_notes:
+                    for open_pitch_midi in E_STANDARD_MIDI:
+                        fret = n.pitch.midi - open_pitch_midi
+                        if 0 < fret <= MAX_FRET:
+                            nonzero_frets.append(fret)
+                if nonzero_frets:
+                    anchor_fret = round(sum(nonzero_frets) / len(nonzero_frets))
+            
+            assignments = assign_chord_strings(shifted_notes, anchor_fret=anchor_fret)
 
             for n_i, (n, sf) in enumerate(assignments):
-                if i+1 in range(28, 34):
-                    print(f"  measure={i+1} n_i={n_i}, pitch={n.pitch}, string={sf.string}, fret={sf.fret}, offset={ele.offset}")
+                # if i+1 in range(28, 34):
+                #     print(f"  measure={i+1} n_i={n_i}, pitch={n.pitch}, string={sf.string}, fret={sf.fret}, offset={ele.offset}")
 
                 n.articulations.append(articulations.StringIndication(sf.string))
                 n.articulations.append(articulations.FretIndication(sf.fret))
@@ -147,9 +164,14 @@ def build_measure(
                     chord_indices.append(note_idx)
 
                 note_idx += 1
+            
+            fretted = [sf.fret for _, sf in assignments if sf.fret > 0]
+            if fretted:
+                open_streak = 0
+                # Set previous fret to be the average of the fretted notes only
+                prev_fret = round(sum(fretted) / len(fretted))
+        
 
-            # Consume one Viterbi slot since we added one pitch 
-            # per chord in collect_midi_pitches
             # sf = string_frets[sf_idx]
             
             # ele.notes[-1].articulations.append(articulations.StringIndication(sf.string))
@@ -173,6 +195,17 @@ def build_measure(
 
             measure.append(ele)
             note_idx += 1
+            
+            if sf.fret > 0:
+                prev_fret = sf.fret
+                open_streak = 0
+            else:
+                # If we have a long enough streak of open notes, then
+                #  consider that as the guitarist having enough time to
+                #  shift their hand anywhere on the guitar
+                open_streak += 1
+                if open_streak >= 4:
+                    prev_fret = 0
 
         elif isinstance(ele, note.Rest):
             # Deep copy rests to avoid music21 stream ownership issues
@@ -183,7 +216,7 @@ def build_measure(
             # elements include rests, so chord_indices must account for them
             note_idx += 1
 
-    return measure, sf_idx, note_idx
+    return measure, sf_idx, note_idx, prev_fret, open_streak
 
 
 def inject_chords(tree: ET.ElementTree, chord_indices: list[int]) -> ET.ElementTree:
@@ -216,8 +249,10 @@ def get_musicxml_tab(xml_path: Path | str):
     chord_indices: list[int] = []
     sf_idx = 0
     note_idx = 0
+    prev_fret = 0
+    open_streak = 0
     for i, old_measure in enumerate(old_measures):
-        measure, sf_idx, note_idx = build_measure(
+        measure, sf_idx, note_idx, prev_fret, open_streak = build_measure(
             i, 
             old_measure, 
             pitch_shift,
@@ -226,7 +261,9 @@ def get_musicxml_tab(xml_path: Path | str):
             chord_indices, 
             note_idx,
             score_info, 
-            use_upper_staff
+            use_upper_staff,
+            prev_fret,
+            open_streak
         )
         part.append(measure)
     
