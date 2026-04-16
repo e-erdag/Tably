@@ -19,7 +19,7 @@ E_STANDARD_MIDI = {
     6: pitch.Pitch('E2').midi,
 }
 
-MAX_FRET = 16
+MAX_FRET = 12
 MAX_SPREAD = 5 # max fret spread in one chord
 MAX_MIDI_PITCH = OPEN_STRING_PITCHES[1].midi + MAX_FRET
 MIN_MIDI_PITCH = OPEN_STRING_PITCHES[6].midi

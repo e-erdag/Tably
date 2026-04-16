@@ -158,7 +158,13 @@ def viterbi(midi_pitches: list[int]) -> list[StringFret]:
             best_prev = None
             
             for prev_sf in candidates[i - 1]:
-                curr_cost = prev_costs[prev_sf] + note_cost(prev_sf, curr_sf)
+                effective_prev = prev_sf
+                if prev_sf.fret == 0 and i >= 2:
+                    back_sf = backpointers[i - 1].get(prev_sf)
+                    if back_sf is not None and back_sf.fret > 0:
+                        effective_prev = back_sf
+                
+                curr_cost = prev_costs[prev_sf] + note_cost(effective_prev, curr_sf)
                 if curr_cost < best_cost:
                     best_cost = curr_cost 
                     best_prev = prev_sf
