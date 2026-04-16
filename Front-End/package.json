@@ -14,6 +14,7 @@
     "@mantine/core": "^9.0.2",
     "@tabler/icons-react": "^3.41.1",
     "@vitejs/plugin-basic-ssl": "^2.1.4",
+    "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
