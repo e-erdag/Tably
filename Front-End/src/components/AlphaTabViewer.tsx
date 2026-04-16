@@ -195,20 +195,23 @@ export default function AlphaTabViewer({
       },
     });
 
-    try {
-      const renderPromise = waitForRender(exportApi);
-      const buffer = await file.arrayBuffer();
-      exportApi.load(buffer);
-      await renderPromise;
-      await new Promise((resolve) => setTimeout(resolve, 150));
-
-      return Array.from(
-        exportMain.querySelectorAll<SVGGraphicsElement>("svg"),
-      );
-    } finally {
+    const cleanup = () => {
       exportApi.destroy();
       document.body.removeChild(exportHost);
-    }
+    };
+
+    const renderPromise = waitForRender(exportApi);
+    const buffer = await file.arrayBuffer();
+    exportApi.load(buffer);
+    await renderPromise;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    return {
+      svgs: Array.from(
+        exportMain.querySelectorAll<SVGGraphicsElement>("svg"),
+      ),
+      cleanup,
+    };
   };
 
   const svgToPageImage = async (svg: SVGGraphicsElement) => {
@@ -261,29 +264,53 @@ export default function AlphaTabViewer({
   };
 
   const downloadPDF = async () => {
-    const svgs = await renderExportSvgs();
-    if (svgs.length === 0) return;
+    try {
+      let cleanup = () => {};
+      let svgs = Array.from(
+        mainRef.current?.querySelectorAll<SVGGraphicsElement>("svg") ?? [],
+      );
 
-    const pages = await Promise.all(svgs.map(svgToPageImage));
-
-    const firstPage = pages[0];
-    const pdf = new jsPDF({
-      orientation: firstPage.width >= firstPage.height ? "landscape" : "portrait",
-      unit: "pt",
-      format: [firstPage.width, firstPage.height],
-    });
-
-    pages.forEach((page, index) => {
-      if (index > 0) {
-        pdf.addPage(
-          [page.width, page.height],
-          page.width >= page.height ? "landscape" : "portrait",
-        );
+      if (svgs.length === 0) {
+        const exportResult = await renderExportSvgs();
+        cleanup = exportResult.cleanup;
+        svgs = exportResult.svgs;
       }
-      pdf.addImage(page.imageData, "PNG", 0, 0, page.width, page.height);
-    });
 
-    pdf.save("tab.pdf");
+      try {
+        if (svgs.length === 0) {
+          throw new Error("No rendered tablature pages were found for export.");
+        }
+
+        const pages = await Promise.all(svgs.map(svgToPageImage));
+        if (pages.length === 0) {
+          throw new Error("No PDF pages were generated.");
+        }
+
+        const firstPage = pages[0];
+        const pdf = new jsPDF({
+          orientation: firstPage.width >= firstPage.height ? "landscape" : "portrait",
+          unit: "pt",
+          format: [firstPage.width, firstPage.height],
+        });
+
+        pages.forEach((page, index) => {
+          if (index > 0) {
+            pdf.addPage(
+              [page.width, page.height],
+              page.width >= page.height ? "landscape" : "portrait",
+            );
+          }
+          pdf.addImage(page.imageData, "PNG", 0, 0, page.width, page.height);
+        });
+
+        pdf.save("tab.pdf");
+      } finally {
+        cleanup();
+      }
+    } catch (error) {
+      console.error("PDF export failed", error);
+      window.alert("PDF export failed. Please open the browser console and send me the error.");
+    }
   };
 
   const isConverting = convertingIndices?.includes(currentIndex) ?? false;
